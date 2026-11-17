@@ -14,7 +14,7 @@ def check(name,condition,detail=None):
     if detail is not None:row['detail']=detail
     RESULT.append(row);print(('PASS ' if condition else 'FAIL ')+name, '' if detail is None else str(detail)[:180],flush=True)
 
-SOURCE=Path(os.environ.get('NAV_SCRIPT',str(ROOT/'ChatGPT_Turn_Navigator_v1.9.1.user.js'))).read_text()
+SOURCE=Path(os.environ.get('NAV_SCRIPT',str(ROOT/'chatgpt-turn-navigator.user.js'))).read_text()
 HOOK='''window.__test={get turns(){return turns;},update:safeUpdate,detectTurns,jumpTo,scanToRepairOrder,
 getTimeline,exportBuild,exportMarkdown,normalizeFlat,normalizeTree,orderEvidence,geometry,contentTracker,navigation,
 get indexCatalog(){return indexCatalog;},set indexCatalog(v){indexCatalog=v;},get apiTurns(){return apiTurns;},

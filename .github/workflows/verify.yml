@@ -20,6 +20,6 @@ jobs:
       - name: Rebuild userscript
         run: python build.py
       - name: Validate JavaScript syntax
-        run: node --check ChatGPT_Turn_Navigator_v1.9.1.user.js
+        run: node --check chatgpt-turn-navigator.user.js
       - name: Check reproducible output
-        run: git diff --exit-code -- ChatGPT_Turn_Navigator_v1.9.1.user.js
+        run: git diff --exit-code -- chatgpt-turn-navigator.user.js

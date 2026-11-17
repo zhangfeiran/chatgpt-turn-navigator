@@ -24,11 +24,9 @@ def main() -> None:
     version = manifest["version"]
     if "@version      " + version not in text:
         raise ValueError("Manifest and userscript version differ")
-    stem = "ChatGPT_Turn_Navigator_v" + version
-    for ext in (".user.js", "_source.txt"):
-        path = root / (stem + ext)
-        path.write_text(text, encoding="utf-8")
-        print(path.name + " (" + str(path.stat().st_size) + " bytes)")
+    path = root / "chatgpt-turn-navigator.user.js"
+    path.write_text(text, encoding="utf-8")
+    print(path.name + " (" + str(path.stat().st_size) + " bytes)")
 
 
 if __name__ == "__main__":

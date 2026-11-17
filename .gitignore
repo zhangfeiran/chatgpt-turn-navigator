@@ -27,3 +27,7 @@ test-results/
 chatgpt*.json
 fixtures/
 private-fixtures/
+
+# Avoid version-suffixed distributables
+ChatGPT_Turn_Navigator_v*.user.js
+ChatGPT_Turn_Navigator_v*_source.txt

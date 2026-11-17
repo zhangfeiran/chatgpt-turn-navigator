@@ -35,3 +35,9 @@
 - Fit eight icon shortcuts into a single footer row; retain tooltips and accessible labels.
 - Remove the always-visible verbose indexing/status sentence. Show temporary feedback only for actions and errors.
 - Keep navigation, export, state persistence, and layout unchanged.
+
+## Repository packaging
+
+- Use the stable root installation artifact `chatgpt-turn-navigator.user.js`.
+- The builder no longer creates versioned JS/TXT duplicates.
+- README links directly to the latest userscript and Tampermonkey extension.
