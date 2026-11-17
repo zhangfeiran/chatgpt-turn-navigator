@@ -1,0 +1,29 @@
+# Developer environment
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+.idea/
+.vscode/
+.DS_Store
+
+# Generated and local test artifacts
+test-output/
+playwright-report/
+test-results/
+*.log
+*.zip
+*_source.txt
+*.bundle
+
+# Never publish saved conversations, browser snapshots or fixtures
+*.html
+*.har
+*.sqlite
+*.sqlite3
+*.db
+chatgpt*.json
+fixtures/
+private-fixtures/

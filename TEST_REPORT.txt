@@ -1,0 +1,167 @@
+ChatGPT Turn Navigator v1.9.0 — 发布测试记录
+
+发布脚本 SHA-256: a7b1a3c1f37e4a2fb9adc9b212edbe3baacce1fe9d7c89fff679415e95a3f815
+发布脚本字节数: 148236
+结果：131 / 131 项本地断言通过（主回归94、边界28、界面操作9）。
+
+验证范围与限制
+测试运行于本地 Chromium + Python Playwright，不连接用户的在线 ChatGPT 账号。
+会话路由、历史接口和存储由测试替身提供；正文几何、Shadow DOM 交互、滚动及文件下载在 Chromium 中执行。
+所用真实页面结构来自此前用户保存的普通聊天、旧版页面及定时任务页面；脚本与外链资源移除，仅设置测试所需容器样式。
+真实结构核对：最新页面2轮/40个标题；旧页面4轮/10个标题；任务页面6轮/24个标题，其中5条独立助手回复。
+不声称已完成在线账号、真实权限授权、真实私有接口或所有网页灰度版本的实测。
+
+关键验证
+首次无正文容器时能等待后续挂载；历史接口持续404时仍能使用已识别轮次。
+单轮虚拟化、先见B后见A、负数scrollTop、已记录灰色轮次定位、不同布局版本不混比比例位置。
+扫描中点击跳转或手动滚动可接管；旧扫描不会恢复旧位置覆盖新操作；侧边栏不移动。
+无正文变化的连续20次更新不重建TOC或Markdown；只改一条回答只重建对应TOC和正文。
+最新实际HTML中20次无变化更新：回答目录构建数2→2，正文构建数4→4；这不是运行耗时基准。
+复制Q/A、单回答、全文、剪贴板拒绝的手动备用框、实际.md下载、完整/部分标记、搜索覆盖率。
+阅读位置只保存消息身份、章节哈希、偏移及时间；刷新不自动滚动；恢复支持前方回答高度变化。
+显式轮次/任务/父子关系优先；树分支跟随选中分支；隐藏分析/工具节点不导出。
+尺寸、贴边、垂直拖动、左下角缩放、点击固定展开、默认折叠与未挂载目录保留等回归通过。
+
+测试复现
+安装包含tests目录，不含用户私有HTML。可用NAV_FIXTURES指向自己的三份HTML fixture。
+没有fixture时会跳过实际HTML项目，因此本机重跑总数可能少于131；不会把跳过算作通过。
+测试专用函数入口只在内存中的测试源码里加入，发布脚本不含测试入口。
+
+逐项结果
+
+[主回归] 94/94
+PASS 01. initial four rounds
+PASS 02. TOCs collapsed by default
+PASS 03. requested default geometry
+PASS 04. click pins panel
+PASS 05. 20 no-change updates do not rebuild outlines
+PASS 06. 20 no-change updates do not rebuild Markdown
+PASS 07. one changed answer rebuilds only its TOC
+PASS 08. one changed answer rebuilds only its body
+PASS 09. exact loaded navigation
+PASS 10. sidebar stays still
+PASS 11. return before jump
+PASS 12. header only moves vertically
+PASS 13. bottom-left resize keeps right fixed
+PASS 14. reset original defaults
+PASS 15. copy Q/A includes full question and answer
+PASS 16. single copy makes no redundant API requests
+PASS 17. answer-only copy omits Q
+PASS 18. full copy marked incomplete when history 404
+PASS 19. 404 full copy uses cooldown
+PASS 20. real Markdown file download
+PASS 21. body search reaches text outside headings
+PASS 22. body search shows its coverage
+PASS 23. clipboard denial offers manual text fallback
+PASS 24. normal UI/export no runtime error
+PASS 25. empty startup safe
+PASS 26. late timeline recovers automatically
+PASS 27. late timeline no runtime error
+PASS 28. normal starts with only B
+PASS 29. normal single-mount A-before-B
+PASS 30. normal unloaded rounds retained
+PASS 31. normal known gray turn navigates by position
+PASS 32. normal scan cannot restore over newer jump
+PASS 33. normal user scroll cancels scan without snapback
+PASS 34. normal scan chronological four-round catalog
+PASS 35. normal scan restores prior reading coordinate
+PASS 36. normal scan never moves sidebar
+PASS 37. normal grey rows visible
+PASS 38. normal loaded filter explicit
+PASS 39. normal all restores grey rows
+PASS 40. normal cached full export order
+PASS 41. normal unloaded body retained in export
+PASS 42. normal virtualization no runtime error
+PASS 43. reverse starts with only B
+PASS 44. reverse single-mount A-before-B
+PASS 45. reverse unloaded rounds retained
+PASS 46. reverse known gray turn navigates by position
+PASS 47. reverse scan cannot restore over newer jump
+PASS 48. reverse user scroll cancels scan without snapback
+PASS 49. reverse scan chronological four-round catalog
+PASS 50. reverse scan restores prior reading coordinate
+PASS 51. reverse scan never moves sidebar
+PASS 52. reverse grey rows visible
+PASS 53. reverse loaded filter explicit
+PASS 54. reverse all restores grey rows
+PASS 55. reverse cached full export order
+PASS 56. reverse unloaded body retained in export
+PASS 57. reverse virtualization no runtime error
+PASS 58. height changes invalidate old coordinate epoch
+PASS 59. new stronger ordering resolves cycle without loss
+PASS 60. reading memory stores identity not prompt/body text
+PASS 61. reading restore follows stable message after preceding height grows
+PASS 62. route switch clears old catalog and bodies
+PASS 63. no reading auto-resume on a different chat
+PASS 64. geometry/reading/route no runtime error
+PASS 65. explicit turn ID retains multi-answer long-running Q/A
+PASS 66. separate task runs never time-merge
+PASS 67. history completion recognized only from API metadata
+PASS 68. raw question not clipped to outline length
+PASS 69. original code table math preserved
+PASS 70. reasoning and tool content excluded
+PASS 71. complete API export not marked partial
+PASS 72. scheduled answer has no invented question
+PASS 73. tree current branch only
+PASS 74. API no runtime error
+PASS 75. nov_saved.html actual DOM count
+PASS 76. nov_saved.html actual DOM exact jump
+PASS 77. nov_saved.html actual DOM sidebar fixed
+PASS 78. nov_saved.html no-change parse reuse
+PASS 79. nov_saved.html complete available bodies exported
+PASS 80. actual November math restored from TeX
+PASS 81. nov_saved.html no runtime error
+PASS 82. oct_saved.html actual DOM count
+PASS 83. oct_saved.html actual DOM exact jump
+PASS 84. oct_saved.html actual DOM sidebar fixed
+PASS 85. oct_saved.html no-change parse reuse
+PASS 86. oct_saved.html complete available bodies exported
+PASS 87. oct_saved.html no runtime error
+PASS 88. scheduled_saved.html actual DOM count
+PASS 89. scheduled_saved.html actual DOM exact jump
+PASS 90. scheduled_saved.html actual DOM sidebar fixed
+PASS 91. scheduled_saved.html no-change parse reuse
+PASS 92. scheduled_saved.html complete available bodies exported
+PASS 93. five scheduled rounds without artificial Q
+PASS 94. scheduled_saved.html no runtime error
+
+[边界场景] 28/28
+PASS 01. pagination failure retains acquired round
+PASS 02. partial pagination retains body and marks incomplete
+PASS 03. partial pagination no runtime error
+PASS 04. tree traverses hidden parent nodes to pair Q/A
+PASS 05. hidden parent nodes remain excluded from export identity
+PASS 06. tree ancestry no runtime error
+PASS 07. route change cancels pending old export
+PASS 08. stale export no runtime error
+PASS 09. manual outline expansion works
+PASS 10. heading search temporarily expands
+PASS 11. clearing search restores collapsed state
+PASS 12. stream change adds new heading
+PASS 13. stream export is labelled snapshot
+PASS 14. diagnostics never contain heading text
+PASS 15. stream / folding no runtime error
+PASS 16. new page restores saved anchor metadata
+PASS 17. reading restore is not automatic
+PASS 18. resume button restores saved position
+PASS 19. user can clear saved reading point
+PASS 20. Home cancels scanner
+PASS 21. Escape cancels scanner
+PASS 22. reading persistence / keys no runtime error
+PASS 23. unsafe links excluded
+PASS 24. code fence protects embedded backticks
+PASS 25. table pipe escaped
+PASS 26. TeX avoids duplicated rendered math
+PASS 27. UI buttons excluded from Markdown
+PASS 28. Markdown conversion no runtime error
+
+[界面操作] 9/9
+PASS 01. Q/A menu copies through real button click
+PASS 02. answer menu copies without question
+PASS 03. Shift+all-export button copies all known rounds
+PASS 04. one-click copy current Q/A
+PASS 05. copy interactions preserve click-to-pin behavior
+PASS 06. copy interactions do not expand collapsed TOCs
+PASS 07. release UI actions no runtime error
+PASS 08. modern response-body-only ID supported
+PASS 09. response-body adapter no runtime error

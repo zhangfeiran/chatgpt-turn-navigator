@@ -1,0 +1,30 @@
+{
+  "version": "1.9.0",
+  "prefix": "src/prefix.js",
+  "suffix": "src/suffix.js",
+  "modules": [
+    "src/core/content-tracker.js",
+    "src/core/navigation-controller.js",
+    "src/core/order-evidence.js",
+    "src/core/geometry-evidence.js",
+    "src/core/reading-store.js",
+    "src/app/state.js",
+    "src/ui/styles.js",
+    "src/ui/panel.js",
+    "src/adapters/dom.js",
+    "src/outline/outline.js",
+    "src/markdown/conversion.js",
+    "src/markdown/actions.js",
+    "src/app/diagnostics.js",
+    "src/adapters/normalize.js",
+    "src/model/catalog.js",
+    "src/model/ordering.js",
+    "src/adapters/history.js",
+    "src/app/update.js",
+    "src/ui/outline-list.js",
+    "src/navigation/actions.js",
+    "src/app/enhancements.js",
+    "src/app/lifecycle.js",
+    "src/app/entry.js"
+  ]
+}

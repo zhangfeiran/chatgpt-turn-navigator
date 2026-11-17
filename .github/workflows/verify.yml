@@ -1,0 +1,25 @@
+name: Verify build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Rebuild userscript
+        run: python build.py
+      - name: Validate JavaScript syntax
+        run: node --check ChatGPT_Turn_Navigator_v1.9.0.user.js
+      - name: Check reproducible output
+        run: git diff --exit-code -- ChatGPT_Turn_Navigator_v1.9.0.user.js
