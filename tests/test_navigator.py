@@ -16,7 +16,7 @@ def check(name,condition,detail=None):
 
 SOURCE=Path(os.environ.get('NAV_SCRIPT',str(ROOT/'chatgpt-turn-navigator.user.js'))).read_text()
 HOOK='''window.__test={get turns(){return turns;},update:safeUpdate,detectTurns,jumpTo,scanToRepairOrder,
-getTimeline,exportBuild,exportMarkdown,normalizeFlat,normalizeTree,orderEvidence,geometry,contentTracker,navigation,
+getTimeline,exportBuild,exportMarkdown,exportRebaseAnswerHeadings,normalizeFlat,normalizeTree,orderEvidence,geometry,contentTracker,navigation,
 get indexCatalog(){return indexCatalog;},set indexCatalog(v){indexCatalog=v;},get apiTurns(){return apiTurns;},
 set apiTurns(v){apiTurns=v;},get exportDOM(){return exportDOM;},exportTurnBody,exportMarkdownDOM,
 captureReadingPoint,restoreReadingPoint,saveReadingPosition,userNavigationIntent,readingStore,

@@ -266,7 +266,50 @@
     const ids=new Set(turnIds(turn));
     return [...exportDOM.values()].find(s=>s.ids.some(id=>ids.has(id)))||null;
   }
-  function exportTurnBody(turn,number,answerSelection=null) {
+  // Only for full-conversation exports: fit each answer's native heading tree
+  // beneath the round's H2 while preserving the heading gaps where possible.
+  // Code fences, math blocks and quoted/indented examples remain untouched.
+  function exportRebaseAnswerHeadings(markdown) {
+    const lines=String(markdown||'').split(/\r?\n/), headings=[];
+    let fence=null, math=null, comment=false, pre=false;
+    for(let i=0;i<lines.length;i++) {
+      const line=lines[i], trimmed=line.trim();
+      if(comment) {if(line.includes('-->')) comment=false;continue;}
+      if(/^ {0,3}<!--/.test(line)) {if(!line.includes('-->')) comment=true;continue;}
+      if(pre) {if(/<\/pre\s*>/i.test(line)) pre=false;continue;}
+      if(/^ {0,3}<pre(?:\s|>)/i.test(line)) {pre=!/<\/pre\s*>/i.test(line);continue;}
+      if(fence) {
+        const end=line.match(/^ {0,3}(`{3,}|~{3,})[ \t]*$/);
+        if(end && end[1][0]===fence.char && end[1].length>=fence.size) fence=null;
+        continue;
+      }
+      const start=line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+      if(start) {fence={char:start[1][0],size:start[1].length};continue;}
+      if(math) {
+        if((math==='$$' && trimmed==='$$') || (math==='\\[' && trimmed==='\\]')) math=null;
+        continue;
+      }
+      if(trimmed==='$$' || trimmed==='\\[') {math=trimmed;continue;}
+      // Ignore indented code, block quotes and nested/list content.
+      if(/^(?: {4}|\t| {0,3}>)/.test(line)) continue;
+      const atx=line.match(/^( {0,3})(#{1,6})(?:[ \t]+(.*)|[ \t]*)$/);
+      if(atx) {headings.push({at:i,level:atx[2].length,prefix:atx[1],text:atx[3]||''});continue;}
+      const underline=lines[i+1]?.match(/^ {0,3}(=+|-+)[ \t]*$/);
+      if(underline && trimmed && !/^ {0,3}(?:[-*+]\s|\d+[.)]\s|<)/.test(line)) {
+        headings.push({at:i,level:underline[1][0]==='='?1:2,text:trimmed,setext:true});
+        i++;
+      }
+    }
+    if(!headings.length) return markdown;
+    const minimum=Math.min(...headings.map(h=>h.level));
+    for(const h of headings) {
+      const level=Math.min(6,3+h.level-minimum); // Markdown ATX headings stop at H6.
+      lines[h.at]=(h.prefix||'')+'#'.repeat(level)+' '+h.text;
+      if(h.setext) lines[h.at+1]='';
+    }
+    return lines.join('\n');
+  }
+  function exportTurnBody(turn,number,answerSelection=null,wholeConversation=false) {
     const snapshot=exportFindSnapshot(turn),ids=turnIds(turn),missing=[],notes=[];
     const api=ids.map(id=>exportAPI.get(id)).filter(Boolean);
     const apiAnswers=api.filter(m=>m.role==='assistant' && m.markdown?.trim());
@@ -302,14 +345,14 @@
     const content=[`## 第 ${number} 轮${turn.role==='assistant'?' · 助手独立回复':''}`];
     if(turn.time!=null) content.push(`时间：${new Date(turn.time).toISOString()}`);
     if(turn.role==='user' && !answerSelection) {
-      content.push('### 提问',question?.markdown||'> [提问正文未取得；目录摘要不能替代完整提问。]');
+      content.push(wholeConversation?'**提问**':'### 提问',question?.markdown||'> [提问正文未取得；目录摘要不能替代完整提问。]');
       if(question) notes.push(...(question.notes||[]));
     }
     answers.forEach((a,i)=>{
-      content.push(`### 回答${answers.length>1?' '+(i+1):''}`,a.markdown);
+      content.push(wholeConversation?`**回答${answers.length>1?' '+(i+1):''}**`:`### 回答${answers.length>1?' '+(i+1):''}`,wholeConversation?exportRebaseAnswerHeadings(a.markdown):a.markdown);
       notes.push(...(a.notes||[]));
     });
-    if(!answers.length) content.push('### 回答','> [回答尚未生成或正文未取得；请在原对话核对。]');
+    if(!answers.length) content.push(wholeConversation?'**回答**':'### 回答','> [回答尚未生成或正文未取得；请在原对话核对。]');
     const bodies=[...answers,...(turn.role==='user'&&!answerSelection&&question?[question]:[])];
     if(bodies.some(b=>b.source==='dom')) notes.push('部分正文由页面转换为 Markdown，复杂卡片或特殊排版可能简化。');
     if(bodies.some(b=>b.unfinished)) {notes.push('导出时部分回答尚在生成，仅包含此刻可取得的内容。');missing.push('回答尚在生成');}
@@ -325,7 +368,7 @@
     return `${base}_${suffix}_${stamp}.md`;
   }
   function exportBuild(selected,kind,selection=null) {
-    const parts=selected.map(({turn,number})=>exportTurnBody(turn,number,selection));
+    const parts=selected.map(({turn,number})=>exportTurnBody(turn,number,selection,kind==='all'));
     const missing=parts.reduce((n,p)=>n+(p.missing.length?1:0),0);
     const generating=!!getTimeline()?.querySelector('[data-is-streaming="true"],[data-message-status="in_progress"]') ||
       !!document.querySelector('[data-testid="stop-button"],[data-testid="composer-stop-button"]');

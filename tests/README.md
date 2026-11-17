@@ -8,6 +8,7 @@ python tests/test_edge_cases.py
 python tests/test_ui_actions.py
 python tests/test_compact_layout.py
 python tests/test_toc_depth.py
+python tests/test_export_headings.py
 ```
 
 可设置 `CHROMIUM_BIN` 指定本机 Chromium 可执行文件。未设置时优先使用系统 Chromium，否则使用 Playwright 默认浏览器。

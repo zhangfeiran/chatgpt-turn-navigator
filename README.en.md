@@ -32,6 +32,10 @@ An independent **Tampermonkey userscript** for navigating long ChatGPT conversat
 
 No external runtime libraries or extra Tampermonkey grants are required. The source is in [`src/`](src/) and is assembled with `python build.py`.
 
+## Whole-conversation Markdown heading levels (v1.9.3)
+
+Only for whole-conversation copy/download: the conversation title stays at `#`, each turn begins with `## 第 N 轮`, and Question / Answer are bold labels rather than Markdown headings. Each answer's highest native heading is rebased to `###`, keeping its relative subheading levels. Fenced code, display math, quoted examples and indented code remain unchanged. Markdown headings are limited to H6. Single-turn Q/A and answer-only exports keep their existing formatting.
+
 ## Shortcuts
 
 | Shortcut | Action |

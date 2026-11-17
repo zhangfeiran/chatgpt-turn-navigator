@@ -49,3 +49,10 @@
 - Manual heading folds override the depth preset. Preset choices persist in session storage across refreshes and remain effective after virtualization unload.
 - Search expansion remains temporary and does not discard the selected depth.
 - Preserve the stable `chatgpt-turn-navigator.user.js` installation path.
+
+## v1.9.3 — Whole-conversation Markdown hierarchy
+
+- Use H2 for each conversation turn; present question/answer labels in bold instead of H3 headings when exporting the full conversation.
+- Rebase each answer's topmost real Markdown heading to H3, preserving relative heading levels while skipping fenced code, math, quotes and indented code.
+- Do not change single-Q/A or answer-only exports.
+- Keep the single stable `chatgpt-turn-navigator.user.js` installer and modular source in sync.
