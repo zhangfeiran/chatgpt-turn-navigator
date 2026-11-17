@@ -4,7 +4,7 @@
   const HEADING_SELECTOR = 'h1,h2,h3,h4,h5,h6,[role="heading"][aria-level]';
   const OUTLINE_EXCLUDE = 'pre,code,blockquote,table,button,nav,aside,[role="dialog"],[role="menu"],[hidden],[aria-hidden="true"],.sr-only,[data-d-component="box"],[data-d-component="card"],[data-d-component="table"]';
   let expandedAnswers = new Set(), foldedHeadings = new Set(), answerCache = new Map();
-  let navigationTargets = [], activeSectionKey = '', hintUntil = 0;
+  let navigationTargets = [], activeSectionKey = '', hintUntil = 0, hintTimer = 0;
 
   function outlineStorageKey() { return OUTLINE_KEY + location.pathname; }
   function loadOutlineState() {
@@ -29,8 +29,14 @@
     } catch (_) {}
   }
   function setHint(text, hold = 4000) {
-    if (shadow) shadow.getElementById('hint').textContent = text;
+    const el = shadow?.getElementById('hint');
+    if (!el) return;
+    clearTimeout(hintTimer);
+    el.textContent = text;
+    el.hidden = false;
     hintUntil = Date.now() + hold;
+    // No permanently occupied bottom status row. Long operations refresh this toast.
+    hintTimer = setTimeout(() => { if (el.isConnected) el.hidden = true; }, Math.min(hold, 9000));
   }
   function outermost(nodes) {
     return nodes.filter((node,i)=>!nodes.some((other,j)=>j!==i && other.contains(node)));

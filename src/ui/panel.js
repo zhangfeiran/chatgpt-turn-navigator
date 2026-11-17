@@ -30,25 +30,28 @@
             <button type="button" id="resetLayout">恢复默认布局</button><button type="button" id="clearReading">清除阅读记录</button></div>
         </div>
         <input id="search" class="search" placeholder="搜索提问、回答章节或轮次编号…" type="search" aria-label="搜索对话轮次" />
-        <div class="search-tools"><select id="searchScope" aria-label="搜索范围" title="正文搜索仅覆盖已取得内容，不会自动加载全对话">
-          <option value="outline">提问 / 标题</option><option value="body">已缓存正文</option></select><span id="searchMeta" aria-live="polite">↑↓ 选择</span>
-          <button class="chip" type="button" id="mountedOnly" aria-pressed="false" title="当前显示全部已索引轮次；点击仅显示正文已加载轮次">全部轮次</button></div>
-        <div class="outline-tools" aria-label="回答目录操作">
-          <button class="chip" type="button" id="expandAll">全部展开</button>
-          <button class="chip" type="button" id="collapseAll">全部折叠</button>
-          <button class="chip" type="button" id="focusCurrent" title="只在目录中显示当前位置，不滚动正文">定位当前</button>
+        <div class="compact-toolbar" aria-label="搜索筛选与回答目录操作">
+          <select id="searchScope" aria-label="搜索范围" title="正文搜索仅覆盖已取得内容，不会自动加载全对话">
+            <option value="outline">提问 / 标题</option><option value="body">已缓存正文</option></select>
+          <button class="chip" type="button" id="mountedOnly" aria-pressed="false" title="当前显示全部已索引轮次；点击仅显示正文已加载轮次">全部轮次</button>
+          <button class="chip toc-tool" type="button" id="expandAll" aria-label="展开全部回答目录" title="展开全部回答目录">▾</button>
+          <button class="chip toc-tool" type="button" id="collapseAll" aria-label="折叠全部回答目录" title="折叠全部回答目录">▸</button>
+          <button class="chip toc-tool" type="button" id="focusCurrent" aria-label="定位当前轮次（不滚动正文）" title="在目录里定位当前轮次，不移动正文">◎</button>
+          <span id="searchMeta" aria-live="polite">↑↓ 选择</span>
         </div>
         <div id="coverage" class="coverage" aria-live="polite"></div>
         <div id="list" aria-label="轮次与回答章节"></div>
-        <div class="foot"><div class="hint" id="hint">仅在浏览器本地运行，不上传对话内容。</div>
-          <div class="actions"><button class="action" id="returnPos" disabled title="返回上一次跳转前的正文位置">↶ 返回原位置</button>
-          <button class="action" id="jumpLast">最新一轮</button>
-          <button class="action" id="jumpTop">加载更早</button>
-          <button class="action" id="refresh">重新读取目录</button>
-          <button class="action" id="exportAll" data-export-action="all" title="点击下载整个当前分支；Shift+点击复制 Markdown。不受搜索或仅已加载筛选影响">↓ 导出整个对话</button>
-          <button class="action" id="exportCurrent" data-export-action="turn" title="导出当前阅读轮次的完整提问及回答为 .md 文件">↓ 导出当前 Q/A</button>
-          <button class="action" id="copyCurrent" data-export-action="turn" title="直接复制当前 Q/A 的 Markdown">⧉ 复制当前 Q/A</button>
-          <button class="action" id="resumeReading" disabled title="按消息身份恢复上次阅读处，不会自动滚动">↩ 继续上次阅读</button></div></div>
+        <div class="foot"><div class="hint" id="hint" role="status" aria-live="polite" hidden></div>
+          <div class="actions" aria-label="快捷操作">
+            <button class="action" id="returnPos" disabled aria-label="返回原位置" title="返回上一次跳转前的正文位置">↶</button>
+            <button class="action" id="jumpLast" aria-label="跳至最新一轮" title="跳到最新一轮">⇣</button>
+            <button class="action" id="jumpTop" aria-label="加载更早历史" title="加载更早历史">⇡</button>
+            <button class="action" id="refresh" aria-label="重新读取目录" title="重新读取目录">⟳</button>
+            <button class="action" id="exportAll" data-export-action="all" aria-label="导出整个对话 Markdown" title="下载整个对话；Shift+点击则复制 Markdown，不受筛选影响">⬇</button>
+            <button class="action" id="exportCurrent" data-export-action="turn" aria-label="导出当前 Q/A Markdown" title="下载当前轮次 Q/A 的 Markdown">Q↓</button>
+            <button class="action" id="copyCurrent" data-export-action="turn" aria-label="复制当前 Q/A Markdown" title="复制当前 Q/A 的 Markdown">⧉</button>
+            <button class="action" id="resumeReading" disabled aria-label="继续上次阅读" title="恢复上次阅读到的消息和章节">⌖</button>
+          </div></div>
         <div id="mdActions" class="md-actions" role="menu" hidden></div>
         <div id="copyFallback" class="copy-fallback" hidden><div class="copy-title">Markdown 已准备好</div>
           <p>浏览器未允许自动复制。点文本框全选后按 Ctrl+C / ⌘C，或再次点击复制。</p>
@@ -191,11 +194,11 @@
       const output = JSON.stringify(diagnose(), null, 2);
       try {
         await navigator.clipboard.writeText(output);
-        shadow.getElementById('hint').textContent = '诊断信息已复制（不含聊天内容），可以发给我排查。';
+        setHint('诊断信息已复制（不含聊天内容），可以发给我排查。');
       } catch (_) {
         // Clipboard access may be disallowed in some Tampermonkey sandboxes.
         console.info('[ChatGPT Turn Navigator] diagnostics:', output);
-        shadow.getElementById('hint').textContent = '诊断信息已输出到开发者工具 Console（F12），不含聊天内容。';
+        setHint('诊断信息已输出到开发者工具 Console（F12），不含聊天内容。');
       }
     });
     document.addEventListener('keydown', onKeyDown, true);

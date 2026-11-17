@@ -26,6 +26,7 @@
       mountedOnly = false; searchSelection = 0; filteredIndices = [];
       syncFilterButton();
       activeIndex = 0; activeSectionKey=''; navigationTargets=[]; answerCache.clear(); loadOutlineState(); hintUntil=0;
+      clearTimeout(hintTimer);hintTimer=0;const hintEl=shadow?.getElementById('hint');if(hintEl)hintEl.hidden=true;
     }
     host.dataset.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
     const dom = detectTurns();
@@ -48,13 +49,7 @@
     counter.textContent = `${turns.length ? Math.min(activeIndex+1,turns.length) + ' / ' : ''}${turns.length} 轮`;
     const unmounted=turns.filter(t=>!t.node).length, mounted=turns.length-unmounted;
     syncFilterButton();
-    if(seekingIndex<0 && Date.now()>hintUntil) {
-      const counts=`已索引 ${turns.length} 轮 · 已加载 ${mounted} · 未加载 ${unmounted}`;
-      shadow.getElementById('hint').textContent=counts+(apiError
-        ? `。历史读取暂不可用，已取得 ${turns.filter(t=>Number.isFinite(t.spatialOrder)).length}/${turns.length} 轮的位置；顺序未完全确认可在⚙中“扫描校正排序”。`
-        : apiComplete ? '。未加载项保留为灰色，点击尝试定位。'
-        : `。${apiStatus}；已识别轮次不会因滚动消失。`);
-    }
+    // Routine indexing details are available in #coverage and diagnostics, not the footer.
     const fingerprint = (bodySearch&&lastSearch?String(exportContentRevision):'')+turns.map(t => `${t.key}:${t.label}:${t.role}:${!!t.node}:`+(t.answers||[]).map(a=>`${a.key}:${a.source}:`+a.headings.map(h=>`${h.level}:${h.text}:${!!h.node?.isConnected}`).join('|')).join('~')).join('\u0001');
     if (force || fingerprint !== lastFingerprint) {
       lastFingerprint = fingerprint; renderTicks();

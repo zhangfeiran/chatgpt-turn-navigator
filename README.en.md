@@ -1,6 +1,6 @@
 # ChatGPT Turn Navigator
 
-[简体中文](README.md) · [Install userscript](ChatGPT_Turn_Navigator_v1.9.0.user.js) · [Architecture](ARCHITECTURE.md)
+[简体中文](README.md) · [Install userscript](ChatGPT_Turn_Navigator_v1.9.1.user.js) · [Architecture](ARCHITECTURE.md)
 
 An independent **Tampermonkey userscript** for navigating long ChatGPT conversations. It provides a dark, right-docked, resizable table of contents with per-answer headings and Markdown export. This project is not affiliated with OpenAI.
 
@@ -18,7 +18,7 @@ An independent **Tampermonkey userscript** for navigating long ChatGPT conversat
 ## Install
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser.
-2. Open [`ChatGPT_Turn_Navigator_v1.9.0.user.js`](ChatGPT_Turn_Navigator_v1.9.0.user.js), click **Raw**, and allow Tampermonkey to install it. Alternatively paste the script into a new Tampermonkey script.
+2. Open [`ChatGPT_Turn_Navigator_v1.9.1.user.js`](ChatGPT_Turn_Navigator_v1.9.1.user.js), click **Raw**, and allow Tampermonkey to install it. Alternatively paste the script into a new Tampermonkey script.
 3. Open a conversation at `chatgpt.com` and refresh. Disable older versions of this script.
 
 No external runtime libraries or extra Tampermonkey grants are required. The source is in [`src/`](src/) and is assembled with `python build.py`.
@@ -45,7 +45,7 @@ Requirements: Python 3.9+ for building; Node.js for optional syntax checks. Brow
 
 ```sh
 python build.py
-node --check ChatGPT_Turn_Navigator_v1.9.0.user.js
+node --check ChatGPT_Turn_Navigator_v1.9.1.user.js
 ```
 
 See [`tests/README.md`](tests/README.md), [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`CHANGELOG.md`](CHANGELOG.md). Private browser snapshots are deliberately not part of the repository.

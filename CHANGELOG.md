@@ -29,3 +29,9 @@
 - 最新 HTML 中回答身份、原始 TeX 和行内代码的适配。
 
 不包含收藏。没有改变默认尺寸、右侧贴边、左下角缩放、点击固定展开及回答 TOC 默认折叠规则。
+## v1.9.1 — Compact controls
+
+- Combine the search/filter and answer-outline controls into one toolbar row.
+- Fit eight icon shortcuts into a single footer row; retain tooltips and accessible labels.
+- Remove the always-visible verbose indexing/status sentence. Show temporary feedback only for actions and errors.
+- Keep navigation, export, state persistence, and layout unchanged.

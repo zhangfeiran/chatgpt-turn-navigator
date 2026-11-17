@@ -1,12 +1,12 @@
 # ChatGPT Turn Navigator
 
-[English](README.en.md) · [安装脚本](ChatGPT_Turn_Navigator_v1.9.0.user.js) · [架构说明](ARCHITECTURE.md)
+[English](README.en.md) · [安装脚本](ChatGPT_Turn_Navigator_v1.9.1.user.js) · [架构说明](ARCHITECTURE.md)
 
 深色、右侧贴边的长对话目录。支持轮次导航、可折叠回答 TOC、定时任务回复、未挂载历史轮次、Markdown 下载/复制、已缓存正文搜索和阅读位置恢复。本版不包含收藏。
 
 ## 安装 / 更新
 
-在 Tampermonkey 中打开原来的脚本，用本包根目录 `ChatGPT_Turn_Navigator_v1.9.0.user.js` 的全部源码覆盖，保存，然后刷新 ChatGPT。仅保留一个版本启用。也可用同名 `_source.txt` 复制源码。
+在 Tampermonkey 中打开原来的脚本，用本包根目录 `ChatGPT_Turn_Navigator_v1.9.1.user.js` 的全部源码覆盖，保存，然后刷新 ChatGPT。仅保留一个版本启用。也可用同名 `_source.txt` 复制源码。
 
 安装只需要这一个 `.user.js`，无需安装 `src` 或运行构建命令。本版保留旧版的位置、宽高、折叠设置和展开方式；没有迁移或清空这些设置。
 
@@ -63,7 +63,7 @@
 
 ```sh
 python build.py
-node --check ChatGPT_Turn_Navigator_v1.9.0.user.js
+node --check ChatGPT_Turn_Navigator_v1.9.1.user.js
 ```
 
 构建只需要 Python 标准库；`node --check` 是可选语法检查。输出仍是一个可安装的脚本，并生成同内容 TXT。模块顺序见 `build-manifest.json`，构建不访问网络。
