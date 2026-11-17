@@ -94,6 +94,7 @@
         const title=document.createElement('span');title.textContent=`回答${answers.length>1?' '+(ai+1):''}目录`;
         const count=document.createElement('span');count.className='toc-count';
         count.textContent=answer.headings.length?`${answer.headings.length} 节${answer.source!=='dom'?' · 待加载':''}`:'无章节标题';
+        toggle.title=`${open?'折叠':'展开'}本回答目录 · ${count.textContent}`;
         toggle.append(glyph,title,count);
         toggle.addEventListener('click',()=>{
           if(isSearchOpen) {
@@ -110,7 +111,19 @@
         amd.title='仅此回答：复制 / 下载 Markdown';amd.setAttribute('aria-label','导出本回答 Markdown');
         amd.dataset.exportAction='answer';amd.dataset.navId=`export-answer:${answer.key}`;amd.disabled=exportBusy;
         amd.addEventListener('click',e=>{e.stopPropagation();openMarkdownActions(e,'answer',turn,exportUnique([answer.key,...answer.ids]));});
-        head.append(toggle,top,amd);box.append(head);
+        // These controls act on this answer only, independently of other turns.
+        const depthBar=document.createElement('div');depthBar.className='toc-depth-actions';
+        depthBar.setAttribute('role','group');depthBar.setAttribute('aria-label','本回答目录展开层级');
+        if(answer.headings.length) for(const depth of [1,2,3]) {
+          const preset=document.createElement('button');preset.type='button';preset.className='toc-depth-button';
+          preset.textContent=`H${depth}`;preset.title=`展示当前回答的前 ${depth} 层标题（按目录层级，起始标题可能是 H2）`;
+          preset.setAttribute('aria-label',`本回答目录展开到第 ${depth} 层`);
+          preset.setAttribute('aria-pressed',String(answerDepths.get(answer.key)===depth));
+          preset.dataset.navId=`depth:${answer.key}:${depth}`;
+          preset.addEventListener('click',()=>setAnswerOutlineDepth(answer,depth));
+          depthBar.append(preset);
+        }
+        head.append(toggle,depthBar,top,amd);box.append(head);
         if(open) {
           const body=document.createElement('div');body.className='toc-body';
           if(!answer.headings.length) {
@@ -121,18 +134,19 @@
             if(lastSearch && !turnMatch && !context.has(hi)) return;
             if(!lastSearch) {
               let p=h.parent;
-              while(p>=0) {if(foldedHeadings.has(answer.headings[p].key)) return;p=answer.headings[p].parent;}
+              while(p>=0) {if(isOutlineHeadingFolded(answer,answer.headings[p])) return;p=answer.headings[p].parent;}
             }
             const row=document.createElement('div');row.className='toc-row';row.style.paddingLeft=`${Math.min(h.depth,5)*12}px`;
             const hasChildren=answer.headings[hi+1]?.parent===hi;
             const fold=document.createElement(hasChildren?'button':'span');fold.className='toc-node-toggle';
             if(hasChildren) {
-              fold.type='button';fold.textContent=foldedHeadings.has(h.key)&&!lastSearch?'▸':'▾';
-              fold.setAttribute('aria-label',`${foldedHeadings.has(h.key)?'展开':'折叠'}“${h.text}”子章节`);
-              fold.setAttribute('aria-expanded',String(!foldedHeadings.has(h.key)||!!lastSearch));fold.dataset.navId=`fold:${h.key}`;
+              fold.type='button';fold.textContent=isOutlineHeadingFolded(answer,h)&&!lastSearch?'▸':'▾';
+              fold.setAttribute('aria-label',`${isOutlineHeadingFolded(answer,h)?'展开':'折叠'}“${h.text}”子章节`);
+              fold.setAttribute('aria-expanded',String(!isOutlineHeadingFolded(answer,h)||!!lastSearch));fold.dataset.navId=`fold:${h.key}`;
               fold.addEventListener('click',()=>{
-                const wasOpen=!foldedHeadings.has(h.key)||!!lastSearch;
+                const wasOpen=!isOutlineHeadingFolded(answer,h)||!!lastSearch;
                 if(lastSearch){search.value='';lastSearch='';expandedAnswers.add(answer.key);}
+                materializeOutlineDepth(answer);
                 if(wasOpen) foldedHeadings.add(h.key);else foldedHeadings.delete(h.key);
                 saveOutlineState();renderList();
               });

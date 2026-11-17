@@ -41,3 +41,11 @@
 - Use the stable root installation artifact `chatgpt-turn-navigator.user.js`.
 - The builder no longer creates versioned JS/TXT duplicates.
 - README links directly to the latest userscript and Tampermonkey extension.
+
+## v1.9.2 — Per-answer TOC depth presets
+
+- Add H1/H2/H3 controls to each answer outline. Show the first one, two, or three heading-tree levels, including answers whose first source heading is H2.
+- Selecting a depth opens only that answer and preserves other answers' fold states.
+- Manual heading folds override the depth preset. Preset choices persist in session storage across refreshes and remain effective after virtualization unload.
+- Search expansion remains temporary and does not discard the selected depth.
+- Preserve the stable `chatgpt-turn-navigator.user.js` installation path.

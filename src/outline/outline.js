@@ -4,11 +4,13 @@
   const HEADING_SELECTOR = 'h1,h2,h3,h4,h5,h6,[role="heading"][aria-level]';
   const OUTLINE_EXCLUDE = 'pre,code,blockquote,table,button,nav,aside,[role="dialog"],[role="menu"],[hidden],[aria-hidden="true"],.sr-only,[data-d-component="box"],[data-d-component="card"],[data-d-component="table"]';
   let expandedAnswers = new Set(), foldedHeadings = new Set(), answerCache = new Map();
+  // Per-answer presets expose one, two, or three visible hierarchy levels.
+  let answerDepths = new Map();
   let navigationTargets = [], activeSectionKey = '', hintUntil = 0, hintTimer = 0;
 
   function outlineStorageKey() { return OUTLINE_KEY + location.pathname; }
   function loadOutlineState() {
-    expandedAnswers = new Set(); foldedHeadings = new Set();
+    expandedAnswers = new Set(); foldedHeadings = new Set(); answerDepths = new Map();
     try {
       const data = JSON.parse(sessionStorage.getItem(outlineStorageKey()) || 'null');
       if (data) {
@@ -17,6 +19,8 @@
         if (data.defaultsVersion === 2)
           expandedAnswers = new Set((Array.isArray(data.answers) ? data.answers : []).filter(x=>typeof x==='string'));
         foldedHeadings = new Set((Array.isArray(data.headings) ? data.headings : []).filter(x=>typeof x==='string'));
+        answerDepths = new Map((Array.isArray(data.depths) ? data.depths : []).filter(x=>
+          Array.isArray(x) && typeof x[0]==='string' && [1,2,3].includes(x[1])));
       }
     } catch (_) {}
   }
@@ -24,7 +28,8 @@
     try {
       sessionStorage.setItem(outlineStorageKey(), JSON.stringify({
         defaultsVersion:2,
-        answers:[...expandedAnswers].slice(-2000), headings:[...foldedHeadings].slice(-4000)
+        answers:[...expandedAnswers].slice(-2000), headings:[...foldedHeadings].slice(-4000),
+        depths:[...answerDepths].slice(-2000)
       }));
     } catch (_) {}
   }
@@ -114,6 +119,8 @@
       for (const a of dom) {
         for (const old of [...cached,...remote].filter(b=>sameAnswer(a,b))) {
           if (expandedAnswers.has(old.key)) expandedAnswers.add(a.key);
+          if (answerDepths.has(old.key) && !answerDepths.has(a.key))
+            answerDepths.set(a.key,answerDepths.get(old.key));
         }
       }
     } else {
@@ -176,12 +183,35 @@
       return {key:id,ids:[id],node:null,source:'api',headings:[]};
     }
   }
+  function isOutlineHeadingFolded(answer,heading) {
+    // Presets are relative to the actual heading tree, so an answer starting
+    // at Markdown H2 still has a useful first level when H1 is selected.
+    const limit=answerDepths.get(answer.key);
+    return limit ? heading.depth >= limit-1 : foldedHeadings.has(heading.key);
+  }
+  function materializeOutlineDepth(answer) {
+    const limit=answerDepths.get(answer.key);
+    if(!limit) return;
+    for(const h of answer.headings) {
+      if(h.depth >= limit-1) foldedHeadings.add(h.key);
+      else foldedHeadings.delete(h.key);
+    }
+    answerDepths.delete(answer.key);
+  }
+  function setAnswerOutlineDepth(answer,depth) {
+    if(![1,2,3].includes(depth)) return;
+    // A user-selected preset replaces the temporary expansion caused by search.
+    if(lastSearch) {search.value='';lastSearch='';searchSelection=0;}
+    expandedAnswers.add(answer.key);
+    answerDepths.set(answer.key,depth);
+    saveOutlineState();renderList();
+  }
   function expandAllOutlines(expand) {
     if(!expand && lastSearch) {search.value='';lastSearch='';searchSelection=0;}
     for(const t of turns) for(const a of t.answers||[]) {
       if(expand) expandedAnswers.add(a.key); else expandedAnswers.delete(a.key);
     }
-    if(expand) foldedHeadings.clear();
+    if(expand) {foldedHeadings.clear();answerDepths.clear();}
     saveOutlineState(); renderList();
     setHint(expand?'已展开回答目录。点击章节左侧箭头可折叠子章节。':'已折叠全部回答目录。');
   }
@@ -190,6 +220,7 @@
     for(const a of turns[activeIndex]?.answers||[]) {
       expandedAnswers.add(a.key);
       a.headings.forEach(h=>foldedHeadings.delete(h.key));
+      answerDepths.delete(a.key);
     }
     search.value=''; lastSearch=''; mountedOnly=false;
     syncFilterButton();

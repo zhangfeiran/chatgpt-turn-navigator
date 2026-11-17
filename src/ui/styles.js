@@ -113,7 +113,13 @@
     .toc-head {display:flex;align-items:center;gap:2px;min-height:29px;}
     .toc-toggle {display:flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--tn-muted);padding:4px 3px;min-width:0;flex:1;text-align:left;font-size:11px;border-radius:5px;}
     .toc-toggle:hover,.answer-top:hover,.toc-node-toggle:hover {background:var(--tn-hover);color:var(--tn-text);}
-    .toc-count {color:#8995a8;font-size:10px;margin-left:auto;white-space:nowrap;}
+    .toc-count {color:#8995a8;font-size:10px;margin-left:auto;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+    .toc-depth-actions {display:flex;align-items:center;flex:none;gap:2px;}
+    .toc-depth-button {height:23px;min-width:25px;padding:0 2px;background:transparent;color:#aab7ca;
+      border:1px solid var(--tn-border);border-radius:5px;font-size:10px;font-weight:600;line-height:1;}
+    .toc-depth-button:hover,.toc-depth-button:focus-visible {background:var(--tn-hover);color:var(--tn-text);}
+    .toc-depth-button[aria-pressed="true"] {background:#214037;border-color:var(--tn-accent);color:var(--tn-accent);}
+    .toc-head:has(.toc-depth-button) .toc-count {display:none;}
     .chevron {width:12px;flex:none;}
     .answer-top {border:0;background:transparent;color:var(--tn-muted);width:24px;height:26px;border-radius:5px;flex:none;}
     .toc-row {display:flex;align-items:flex-start;gap:1px;}

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT 轮次导航 / Turn Navigator
 // @namespace    https://chatgpt.com/
-// @version      1.9.1
+// @version      1.9.2
 // @description  Modular local-first navigator: safe virtualized navigation, incremental TOCs, Markdown download/copy, cached-body search and reading resume.
 // @author       ChatGPT
 // @match        https://chatgpt.com/*
@@ -355,7 +355,13 @@
     .toc-head {display:flex;align-items:center;gap:2px;min-height:29px;}
     .toc-toggle {display:flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--tn-muted);padding:4px 3px;min-width:0;flex:1;text-align:left;font-size:11px;border-radius:5px;}
     .toc-toggle:hover,.answer-top:hover,.toc-node-toggle:hover {background:var(--tn-hover);color:var(--tn-text);}
-    .toc-count {color:#8995a8;font-size:10px;margin-left:auto;white-space:nowrap;}
+    .toc-count {color:#8995a8;font-size:10px;margin-left:auto;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+    .toc-depth-actions {display:flex;align-items:center;flex:none;gap:2px;}
+    .toc-depth-button {height:23px;min-width:25px;padding:0 2px;background:transparent;color:#aab7ca;
+      border:1px solid var(--tn-border);border-radius:5px;font-size:10px;font-weight:600;line-height:1;}
+    .toc-depth-button:hover,.toc-depth-button:focus-visible {background:var(--tn-hover);color:var(--tn-text);}
+    .toc-depth-button[aria-pressed="true"] {background:#214037;border-color:var(--tn-accent);color:var(--tn-accent);}
+    .toc-head:has(.toc-depth-button) .toc-count {display:none;}
     .chevron {width:12px;flex:none;}
     .answer-top {border:0;background:transparent;color:var(--tn-muted);width:24px;height:26px;border-radius:5px;flex:none;}
     .toc-row {display:flex;align-items:flex-start;gap:1px;}
@@ -810,11 +816,13 @@
   const HEADING_SELECTOR = 'h1,h2,h3,h4,h5,h6,[role="heading"][aria-level]';
   const OUTLINE_EXCLUDE = 'pre,code,blockquote,table,button,nav,aside,[role="dialog"],[role="menu"],[hidden],[aria-hidden="true"],.sr-only,[data-d-component="box"],[data-d-component="card"],[data-d-component="table"]';
   let expandedAnswers = new Set(), foldedHeadings = new Set(), answerCache = new Map();
+  // Per-answer presets expose one, two, or three visible hierarchy levels.
+  let answerDepths = new Map();
   let navigationTargets = [], activeSectionKey = '', hintUntil = 0, hintTimer = 0;
 
   function outlineStorageKey() { return OUTLINE_KEY + location.pathname; }
   function loadOutlineState() {
-    expandedAnswers = new Set(); foldedHeadings = new Set();
+    expandedAnswers = new Set(); foldedHeadings = new Set(); answerDepths = new Map();
     try {
       const data = JSON.parse(sessionStorage.getItem(outlineStorageKey()) || 'null');
       if (data) {
@@ -823,6 +831,8 @@
         if (data.defaultsVersion === 2)
           expandedAnswers = new Set((Array.isArray(data.answers) ? data.answers : []).filter(x=>typeof x==='string'));
         foldedHeadings = new Set((Array.isArray(data.headings) ? data.headings : []).filter(x=>typeof x==='string'));
+        answerDepths = new Map((Array.isArray(data.depths) ? data.depths : []).filter(x=>
+          Array.isArray(x) && typeof x[0]==='string' && [1,2,3].includes(x[1])));
       }
     } catch (_) {}
   }
@@ -830,7 +840,8 @@
     try {
       sessionStorage.setItem(outlineStorageKey(), JSON.stringify({
         defaultsVersion:2,
-        answers:[...expandedAnswers].slice(-2000), headings:[...foldedHeadings].slice(-4000)
+        answers:[...expandedAnswers].slice(-2000), headings:[...foldedHeadings].slice(-4000),
+        depths:[...answerDepths].slice(-2000)
       }));
     } catch (_) {}
   }
@@ -920,6 +931,8 @@
       for (const a of dom) {
         for (const old of [...cached,...remote].filter(b=>sameAnswer(a,b))) {
           if (expandedAnswers.has(old.key)) expandedAnswers.add(a.key);
+          if (answerDepths.has(old.key) && !answerDepths.has(a.key))
+            answerDepths.set(a.key,answerDepths.get(old.key));
         }
       }
     } else {
@@ -982,12 +995,35 @@
       return {key:id,ids:[id],node:null,source:'api',headings:[]};
     }
   }
+  function isOutlineHeadingFolded(answer,heading) {
+    // Presets are relative to the actual heading tree, so an answer starting
+    // at Markdown H2 still has a useful first level when H1 is selected.
+    const limit=answerDepths.get(answer.key);
+    return limit ? heading.depth >= limit-1 : foldedHeadings.has(heading.key);
+  }
+  function materializeOutlineDepth(answer) {
+    const limit=answerDepths.get(answer.key);
+    if(!limit) return;
+    for(const h of answer.headings) {
+      if(h.depth >= limit-1) foldedHeadings.add(h.key);
+      else foldedHeadings.delete(h.key);
+    }
+    answerDepths.delete(answer.key);
+  }
+  function setAnswerOutlineDepth(answer,depth) {
+    if(![1,2,3].includes(depth)) return;
+    // A user-selected preset replaces the temporary expansion caused by search.
+    if(lastSearch) {search.value='';lastSearch='';searchSelection=0;}
+    expandedAnswers.add(answer.key);
+    answerDepths.set(answer.key,depth);
+    saveOutlineState();renderList();
+  }
   function expandAllOutlines(expand) {
     if(!expand && lastSearch) {search.value='';lastSearch='';searchSelection=0;}
     for(const t of turns) for(const a of t.answers||[]) {
       if(expand) expandedAnswers.add(a.key); else expandedAnswers.delete(a.key);
     }
-    if(expand) foldedHeadings.clear();
+    if(expand) {foldedHeadings.clear();answerDepths.clear();}
     saveOutlineState(); renderList();
     setHint(expand?'已展开回答目录。点击章节左侧箭头可折叠子章节。':'已折叠全部回答目录。');
   }
@@ -996,6 +1032,7 @@
     for(const a of turns[activeIndex]?.answers||[]) {
       expandedAnswers.add(a.key);
       a.headings.forEach(h=>foldedHeadings.delete(h.key));
+      answerDepths.delete(a.key);
     }
     search.value=''; lastSearch=''; mountedOnly=false;
     syncFilterButton();
@@ -1974,6 +2011,7 @@
         const title=document.createElement('span');title.textContent=`回答${answers.length>1?' '+(ai+1):''}目录`;
         const count=document.createElement('span');count.className='toc-count';
         count.textContent=answer.headings.length?`${answer.headings.length} 节${answer.source!=='dom'?' · 待加载':''}`:'无章节标题';
+        toggle.title=`${open?'折叠':'展开'}本回答目录 · ${count.textContent}`;
         toggle.append(glyph,title,count);
         toggle.addEventListener('click',()=>{
           if(isSearchOpen) {
@@ -1990,7 +2028,19 @@
         amd.title='仅此回答：复制 / 下载 Markdown';amd.setAttribute('aria-label','导出本回答 Markdown');
         amd.dataset.exportAction='answer';amd.dataset.navId=`export-answer:${answer.key}`;amd.disabled=exportBusy;
         amd.addEventListener('click',e=>{e.stopPropagation();openMarkdownActions(e,'answer',turn,exportUnique([answer.key,...answer.ids]));});
-        head.append(toggle,top,amd);box.append(head);
+        // These controls act on this answer only, independently of other turns.
+        const depthBar=document.createElement('div');depthBar.className='toc-depth-actions';
+        depthBar.setAttribute('role','group');depthBar.setAttribute('aria-label','本回答目录展开层级');
+        if(answer.headings.length) for(const depth of [1,2,3]) {
+          const preset=document.createElement('button');preset.type='button';preset.className='toc-depth-button';
+          preset.textContent=`H${depth}`;preset.title=`展示当前回答的前 ${depth} 层标题（按目录层级，起始标题可能是 H2）`;
+          preset.setAttribute('aria-label',`本回答目录展开到第 ${depth} 层`);
+          preset.setAttribute('aria-pressed',String(answerDepths.get(answer.key)===depth));
+          preset.dataset.navId=`depth:${answer.key}:${depth}`;
+          preset.addEventListener('click',()=>setAnswerOutlineDepth(answer,depth));
+          depthBar.append(preset);
+        }
+        head.append(toggle,depthBar,top,amd);box.append(head);
         if(open) {
           const body=document.createElement('div');body.className='toc-body';
           if(!answer.headings.length) {
@@ -2001,18 +2051,19 @@
             if(lastSearch && !turnMatch && !context.has(hi)) return;
             if(!lastSearch) {
               let p=h.parent;
-              while(p>=0) {if(foldedHeadings.has(answer.headings[p].key)) return;p=answer.headings[p].parent;}
+              while(p>=0) {if(isOutlineHeadingFolded(answer,answer.headings[p])) return;p=answer.headings[p].parent;}
             }
             const row=document.createElement('div');row.className='toc-row';row.style.paddingLeft=`${Math.min(h.depth,5)*12}px`;
             const hasChildren=answer.headings[hi+1]?.parent===hi;
             const fold=document.createElement(hasChildren?'button':'span');fold.className='toc-node-toggle';
             if(hasChildren) {
-              fold.type='button';fold.textContent=foldedHeadings.has(h.key)&&!lastSearch?'▸':'▾';
-              fold.setAttribute('aria-label',`${foldedHeadings.has(h.key)?'展开':'折叠'}“${h.text}”子章节`);
-              fold.setAttribute('aria-expanded',String(!foldedHeadings.has(h.key)||!!lastSearch));fold.dataset.navId=`fold:${h.key}`;
+              fold.type='button';fold.textContent=isOutlineHeadingFolded(answer,h)&&!lastSearch?'▸':'▾';
+              fold.setAttribute('aria-label',`${isOutlineHeadingFolded(answer,h)?'展开':'折叠'}“${h.text}”子章节`);
+              fold.setAttribute('aria-expanded',String(!isOutlineHeadingFolded(answer,h)||!!lastSearch));fold.dataset.navId=`fold:${h.key}`;
               fold.addEventListener('click',()=>{
-                const wasOpen=!foldedHeadings.has(h.key)||!!lastSearch;
+                const wasOpen=!isOutlineHeadingFolded(answer,h)||!!lastSearch;
                 if(lastSearch){search.value='';lastSearch='';expandedAnswers.add(answer.key);}
+                materializeOutlineDepth(answer);
                 if(wasOpen) foldedHeadings.add(h.key);else foldedHeadings.delete(h.key);
                 saveOutlineState();renderList();
               });
