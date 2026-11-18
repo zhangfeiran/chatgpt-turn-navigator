@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT 轮次导航 / Turn Navigator
 // @namespace    https://chatgpt.com/
-// @version      1.9.4
+// @version      1.9.5
 // @description  Modular local-first navigator: safe virtualized navigation, incremental TOCs, Markdown download/copy, cached-body search and reading resume.
 // @author       ChatGPT
 // @match        https://chatgpt.com/*
@@ -864,7 +864,7 @@
       if (data) {
         // Ignore pre-1.7.2 expansion state once on upgrade. Thereafter, restore
         // only the choices explicitly saved under the collapsed-by-default policy.
-        if (data.defaultsVersion === 2)
+        if (data.defaultsVersion === 2 || data.defaultsVersion === 3)
           expandedAnswers = new Set((Array.isArray(data.answers) ? data.answers : []).filter(x=>typeof x==='string'));
         foldedHeadings = new Set((Array.isArray(data.headings) ? data.headings : []).filter(x=>typeof x==='string'));
         answerDepths = new Map((Array.isArray(data.depths) ? data.depths : []).filter(x=>
@@ -2142,7 +2142,8 @@
         }
         if(lastSearch && !turnMatch && !matching.size) return;
         const isSearchOpen=!!lastSearch && (turnMatch||matching.size>0);
-        const open=isSearchOpen || !collapsedAnswers.has(answer.key);
+        // Closed until the user explicitly opens this answer; scrolling never opens it.
+        const open=isSearchOpen || (expandedAnswers.has(answer.key) && !collapsedAnswers.has(answer.key));
         const box=document.createElement('div');box.className='answer-outline';
         const head=document.createElement('div');head.className='toc-head';
         const toggle=document.createElement('button');toggle.type='button';toggle.className='toc-toggle';
@@ -2176,7 +2177,7 @@
           const preset=document.createElement('button');preset.type='button';preset.className='toc-depth-button';
           preset.textContent=`H${depth}`;preset.title=`本回答显示前 ${depth} 层章节。手动选择后保持固定，再次点击可恢复自动跟随`;
           preset.setAttribute('aria-label',`本回答目录展开到第 ${depth} 层`);
-          preset.setAttribute('aria-pressed',String(answerDepths.has(answer.key)?answerDepths.get(answer.key)===depth:depth===1));
+          preset.setAttribute('aria-pressed',String(open && (answerDepths.has(answer.key)?answerDepths.get(answer.key)===depth:depth===1)));
           preset.dataset.navId=`depth:${answer.key}:${depth}`;
           preset.addEventListener('click',()=>setAnswerOutlineDepth(answer,depth));
           depthBar.append(preset);

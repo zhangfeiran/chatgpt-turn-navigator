@@ -27,7 +27,7 @@
       if (data) {
         // Ignore pre-1.7.2 expansion state once on upgrade. Thereafter, restore
         // only the choices explicitly saved under the collapsed-by-default policy.
-        if (data.defaultsVersion === 2)
+        if (data.defaultsVersion === 2 || data.defaultsVersion === 3)
           expandedAnswers = new Set((Array.isArray(data.answers) ? data.answers : []).filter(x=>typeof x==='string'));
         foldedHeadings = new Set((Array.isArray(data.headings) ? data.headings : []).filter(x=>typeof x==='string'));
         answerDepths = new Map((Array.isArray(data.depths) ? data.depths : []).filter(x=>

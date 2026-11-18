@@ -64,3 +64,10 @@
 - Explicitly opened/closed heading branches stay fixed across scrolls and virtualized unmounting. H1/H2/H3 depth presets lock depth; selecting the active preset again restores automatic following.
 - Add a ↵ wrap toggle to the panel header for complete question/heading labels, saved in localStorage.
 - Preserve right-docked layout, Markdown exports, single-file installer and navigation semantics.
+
+## v1.9.5 — Keep answer TOCs closed until opened manually
+
+- Restore collapsed-by-default behavior for each answer TOC, while retaining automatic H1 root-follow after a user opens that answer.
+- Scrolling never opens a closed answer's TOC; H1/H2/H3 controls still explicitly open and set its depth.
+- Correctly restore saved v1.9.4 manually expanded answers after refresh (defaultsVersion 3).
+- Retain title wrapping, manual branch pins, Markdown export, and the stable installer path.

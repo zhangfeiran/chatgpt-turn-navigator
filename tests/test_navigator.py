@@ -69,6 +69,7 @@ with sync_playwright() as p:
  check('default width and preferred height',h.debug()['panelLayout']['w']==360 and h.debug()['panelLayout']['preferredHeight']==950)
  h.ui('#launcher').click()
  check('panel opens',h.ui('#panel').is_visible())
+ check('answer TOCs remain closed until clicked',h.ui('.toc-body').count()==0)
  before=h.debug()['incremental'];h.ev('()=>{for(let i=0;i<20;i++)__test.update(false)}');after=h.debug()['incremental']
  check('repeated updates reuse answer outlines',after['outlineBuilds']==before['outlineBuilds'])
  check('repeated updates reuse cached Markdown',after['bodyBuilds']==before['bodyBuilds'])

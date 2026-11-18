@@ -31,7 +31,8 @@ with sync_playwright() as p:
  h.close('stale export')
  # Stream update and nested heading toggle, search expansion restoration.
  h=Harness(b)
- h.ui('#launcher').click();check('answer outline opens to H1 by default',h.ui('.toc-toggle').nth(0).get_attribute('aria-expanded')=='true')
+ h.ui('#launcher').click();check('answer outline initially collapsed',h.ui('.toc-toggle').nth(0).get_attribute('aria-expanded')=='false')
+ h.ui('.toc-toggle').nth(0).click();check('manual outline expansion works',h.ui('.toc-toggle').nth(0).get_attribute('aria-expanded')=='true')
  h.ui('.toc-toggle').nth(0).click();check('manual outline collapse works',h.ui('.toc-toggle').nth(0).get_attribute('aria-expanded')=='false')
  h.ui('.toc-toggle').nth(0).click();h.ui('#search').fill('子标题 0')
  check('heading search temporarily expands',h.ui('.toc-toggle').nth(0).get_attribute('aria-expanded')=='true')
