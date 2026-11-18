@@ -111,6 +111,11 @@
     .turn-group:last-child {border-bottom:0;}
     .answer-outline {margin:2px 0 2px 31px;border-left:1px solid #3b4351;padding-left:5px;}
     .toc-head {display:flex;align-items:center;gap:2px;min-height:29px;}
+    .wrap-button {flex:none;width:27px;height:25px;padding:0;border:1px solid var(--tn-border);
+      border-radius:6px;background:transparent;color:var(--tn-muted);font-size:17px;line-height:1;cursor:pointer;}
+    .wrap-button:hover {background:var(--tn-hover);color:var(--tn-text);}
+    .wrap-button[aria-pressed="true"] {background:#214037;border-color:var(--tn-accent);color:var(--tn-accent);}
+    .toc-row.toc-auto-root > .toc-link {box-shadow:inset 2px 0 #567e76;}
     .toc-toggle {display:flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--tn-muted);padding:4px 3px;min-width:0;flex:1;text-align:left;font-size:11px;border-radius:5px;}
     .toc-toggle:hover,.answer-top:hover,.toc-node-toggle:hover {background:var(--tn-hover);color:var(--tn-text);}
     .toc-count {color:#8995a8;font-size:10px;margin-left:auto;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;}
@@ -130,6 +135,12 @@
     .toc-link.search-selected {outline:1px solid #648875;outline-offset:-1px;background:var(--tn-hover);}
     .toc-level {font-size:9px;font-variant-numeric:tabular-nums;color:#8795a8;flex:none;}
     .toc-text {overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+    /* Opt-in full wrapping for questions and TOC heading labels, not the body. */
+    :host([data-wrap-titles="true"]) .label,
+    :host([data-wrap-titles="true"]) .toc-text {
+      display:block;-webkit-line-clamp:unset;-webkit-box-orient:initial;
+      white-space:normal;overflow:visible;overflow-wrap:anywhere;word-break:break-word;
+    }
     .toc-empty {font-size:11px;color:var(--tn-muted);padding:5px 7px 7px;}
     .toc-link mark {background:#80692a;color:#fff3b4;border-radius:2px;padding:0 1px;}
     button:focus-visible {outline:2px solid var(--tn-accent);outline-offset:-2px;}

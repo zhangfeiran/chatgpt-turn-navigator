@@ -6,11 +6,22 @@
   let expandedAnswers = new Set(), foldedHeadings = new Set(), answerCache = new Map();
   // Per-answer presets expose one, two, or three visible hierarchy levels.
   let answerDepths = new Map();
+  // Default: show root-level headings. Manual closed answers/branches persist;
+  // auto expansion of the currently read root is ephemeral and never persisted.
+  let collapsedAnswers = new Set(), pinnedOpenHeadings = new Set();
+  let activeAutoAnswerKey = '', activeAutoRootKey = '', autoOutlineRaf = 0;
+  const WRAP_TITLES_KEY = 'chatgpt-turn-nav-wrap-titles-v1';
+  let wrapTitles = false;
+  try { wrapTitles = localStorage.getItem(WRAP_TITLES_KEY) === '1'; } catch (_) {}
   let navigationTargets = [], activeSectionKey = '', hintUntil = 0, hintTimer = 0;
 
   function outlineStorageKey() { return OUTLINE_KEY + location.pathname; }
   function loadOutlineState() {
     expandedAnswers = new Set(); foldedHeadings = new Set(); answerDepths = new Map();
+    collapsedAnswers = new Set(); pinnedOpenHeadings = new Set();
+    activeAutoAnswerKey = ''; activeAutoRootKey = '';
+    if (autoOutlineRaf) cancelAnimationFrame(autoOutlineRaf);
+    autoOutlineRaf = 0;
     try {
       const data = JSON.parse(sessionStorage.getItem(outlineStorageKey()) || 'null');
       if (data) {
@@ -20,16 +31,22 @@
           expandedAnswers = new Set((Array.isArray(data.answers) ? data.answers : []).filter(x=>typeof x==='string'));
         foldedHeadings = new Set((Array.isArray(data.headings) ? data.headings : []).filter(x=>typeof x==='string'));
         answerDepths = new Map((Array.isArray(data.depths) ? data.depths : []).filter(x=>
-          Array.isArray(x) && typeof x[0]==='string' && [1,2,3].includes(x[1])));
+          Array.isArray(x) && typeof x[0]==='string' && [1,2,3,6].includes(x[1])));
+        if (data.defaultsVersion === 3) {
+          collapsedAnswers = new Set((Array.isArray(data.collapsedAnswers) ? data.collapsedAnswers : []).filter(x=>typeof x==='string'));
+          pinnedOpenHeadings = new Set((Array.isArray(data.pinnedHeadings) ? data.pinnedHeadings : []).filter(x=>typeof x==='string'));
+        }
       }
     } catch (_) {}
   }
   function saveOutlineState() {
     try {
       sessionStorage.setItem(outlineStorageKey(), JSON.stringify({
-        defaultsVersion:2,
+        defaultsVersion:3,
         answers:[...expandedAnswers].slice(-2000), headings:[...foldedHeadings].slice(-4000),
-        depths:[...answerDepths].slice(-2000)
+        depths:[...answerDepths].slice(-2000),
+        collapsedAnswers:[...collapsedAnswers].slice(-2000),
+        pinnedHeadings:[...pinnedOpenHeadings].slice(-4000)
       }));
     } catch (_) {}
   }
@@ -119,8 +136,17 @@
       for (const a of dom) {
         for (const old of [...cached,...remote].filter(b=>sameAnswer(a,b))) {
           if (expandedAnswers.has(old.key)) expandedAnswers.add(a.key);
+          if (collapsedAnswers.has(old.key)) collapsedAnswers.add(a.key);
           if (answerDepths.has(old.key) && !answerDepths.has(a.key))
             answerDepths.set(a.key,answerDepths.get(old.key));
+          // Reconciliation may replace a DOM answer's identity; transfer pin states
+          // only for matching heading positions/text to prevent pinning a wrong title.
+          for (let hi=0;hi<Math.min(old.headings.length,a.headings.length);hi++) {
+            const from=old.headings[hi],to=a.headings[hi];
+            if(from.level!==to.level || from.text!==to.text) continue;
+            if(pinnedOpenHeadings.has(from.key)) pinnedOpenHeadings.add(to.key);
+            if(foldedHeadings.has(from.key)) foldedHeadings.add(to.key);
+          }
         }
       }
     } else {
@@ -183,44 +209,65 @@
       return {key:id,ids:[id],node:null,source:'api',headings:[]};
     }
   }
+  function isInHeadingSubtree(answer,heading,rootKey) {
+    let current=heading;
+    while(current) {
+      if(current.key===rootKey) return true;
+      current=current.parent>=0 ? answer.headings[current.parent] : null;
+    }
+    return false;
+  }
   function isOutlineHeadingFolded(answer,heading) {
-    // Presets are relative to the actual heading tree, so an answer starting
-    // at Markdown H2 still has a useful first level when H1 is selected.
+    // Explicit user action always outranks auto-follow (including explicit close).
+    if(foldedHeadings.has(heading.key)) return true;
+    for(const key of pinnedOpenHeadings) {
+      if(key.startsWith(answer.key+'|') && isInHeadingSubtree(answer,heading,key)) return false;
+    }
     const limit=answerDepths.get(answer.key);
-    return limit ? heading.depth >= limit-1 : foldedHeadings.has(heading.key);
+    if(limit) return heading.depth >= limit-1; // Manual H1/H2/H3 choice locks the depth.
+    if(activeAutoAnswerKey===answer.key && activeAutoRootKey &&
+       isInHeadingSubtree(answer,heading,activeAutoRootKey)) return false;
+    return true; // Default H1 outline: show roots, fold their descendants.
   }
   function materializeOutlineDepth(answer) {
-    const limit=answerDepths.get(answer.key);
-    if(!limit) return;
-    for(const h of answer.headings) {
-      if(h.depth >= limit-1) foldedHeadings.add(h.key);
-      else foldedHeadings.delete(h.key);
-    }
+    // Kept as a compatibility helper: manual heading choices no longer destroy
+    // the saved per-answer depth preset.
     answerDepths.delete(answer.key);
   }
   function setAnswerOutlineDepth(answer,depth) {
     if(![1,2,3].includes(depth)) return;
-    // A user-selected preset replaces the temporary expansion caused by search.
     if(lastSearch) {search.value='';lastSearch='';searchSelection=0;}
+    collapsedAnswers.delete(answer.key);
     expandedAnswers.add(answer.key);
-    answerDepths.set(answer.key,depth);
+    // Clicking an already selected preset returns to automatic follow mode.
+    if(answerDepths.get(answer.key)===depth) answerDepths.delete(answer.key);
+    else answerDepths.set(answer.key,depth);
+    for(const h of answer.headings) {
+      foldedHeadings.delete(h.key);pinnedOpenHeadings.delete(h.key);
+    }
     saveOutlineState();renderList();
   }
   function expandAllOutlines(expand) {
     if(!expand && lastSearch) {search.value='';lastSearch='';searchSelection=0;}
     for(const t of turns) for(const a of t.answers||[]) {
-      if(expand) expandedAnswers.add(a.key); else expandedAnswers.delete(a.key);
+      if(expand) {
+        collapsedAnswers.delete(a.key);expandedAnswers.add(a.key);
+        answerDepths.set(a.key,6); // All available heading levels.
+      } else {
+        collapsedAnswers.add(a.key);expandedAnswers.delete(a.key);
+        answerDepths.delete(a.key);
+      }
     }
-    if(expand) {foldedHeadings.clear();answerDepths.clear();}
-    saveOutlineState(); renderList();
-    setHint(expand?'已展开回答目录。点击章节左侧箭头可折叠子章节。':'已折叠全部回答目录。');
+    if(expand) {foldedHeadings.clear();pinnedOpenHeadings.clear();}
+    saveOutlineState();renderList();
+    setHint(expand?'已展开全部回答的章节。':'已折叠全部回答目录。');
   }
   function focusCurrentOutline() {
     if(seekingIndex<0) updateActive();
     for(const a of turns[activeIndex]?.answers||[]) {
-      expandedAnswers.add(a.key);
-      a.headings.forEach(h=>foldedHeadings.delete(h.key));
-      answerDepths.delete(a.key);
+      expandedAnswers.add(a.key);collapsedAnswers.delete(a.key);
+      a.headings.forEach(h=>{foldedHeadings.delete(h.key);pinnedOpenHeadings.delete(h.key);});
+      answerDepths.set(a.key,6);
     }
     search.value=''; lastSearch=''; mountedOnly=false;
     syncFilterButton();
@@ -253,23 +300,48 @@
       anonymous:!answer.ids.length,...(h?{text:h.text,level:h.level,occurrence:h.occurrence,sectionKey:h.key}:{})};
   }
   function updateActiveSection() {
-    let current='';
+    let current='', currentAnswer=null, currentHeading=null;
     const timeline=getTimeline();
-    if(timeline) {
+    if(timeline && turns.length) {
       const boundary=timeline.getBoundingClientRect().top+Math.min(120,timeline.clientHeight*.25);
       let top=-Infinity;
-      for(const a of turns[activeIndex]?.answers||[]) for(const h of a.headings) {
-        if(!h.node?.isConnected) continue;
-        const r=h.node.getBoundingClientRect();
-        if(r.height>0 && r.top<=boundary+2 && r.top>top) {top=r.top;current=h.key;}
+      for(const answer of turns[activeIndex]?.answers||[]) {
+        // Don't carry the previous answer's H1 into the next reply.
+        const box=answer.node?.isConnected?answer.node.getBoundingClientRect():null;
+        if(box && (box.bottom<=boundary || box.top>boundary+2)) continue;
+        for(const heading of answer.headings) {
+          if(!heading.node?.isConnected || !timeline.contains(heading.node)) continue;
+          const rect=heading.node.getBoundingClientRect();
+          if(rect.height>0 && rect.top<=boundary+2 && rect.top>top) {
+            top=rect.top;current=heading.key;currentAnswer=answer;currentHeading=heading;
+          }
+        }
       }
     }
     activeSectionKey=current;
-    if(panel.classList.contains('open')) {
+    let rootKey='',answerKey='';
+    if(currentAnswer && currentHeading) {
+      let root=currentHeading;
+      while(root.parent>=0) root=currentAnswer.headings[root.parent];
+      rootKey=root.key;answerKey=currentAnswer.key;
+    }
+    const changed=rootKey!==activeAutoRootKey || answerKey!==activeAutoAnswerKey;
+    activeAutoRootKey=rootKey;activeAutoAnswerKey=answerKey;
+    if(panel?.classList.contains('open')) {
+      const visibleCurrent=list.querySelector('.toc-link[data-section="'+current+'"]');
+      const highlighted=visibleCurrent ? current : rootKey;
       for(const el of list.querySelectorAll('.toc-link')) {
-        const active=el.dataset.section===current;
+        const active=el.dataset.section===highlighted;
         el.classList.toggle('section-active',active);
         if(active) el.setAttribute('aria-current','location');else el.removeAttribute('aria-current');
+      }
+      // One queued list rebuild per root transition. No state is saved, and
+      // scrolling does not override manual choices or move the main transcript.
+      if(changed && !lastSearch && !autoOutlineRaf) {
+        autoOutlineRaf=requestAnimationFrame(()=>{
+          autoOutlineRaf=0;
+          if(panel?.classList.contains('open') && !lastSearch)renderList();
+        });
       }
     }
   }

@@ -17,7 +17,9 @@
       <section id="panel" aria-label="对话轮次目录">
         <div class="head" id="dragHeader" title="点击固定目录；按住上下拖动">
           <div class="title">☷ 对话目录 <span class="count" id="counter"></span></div>
-          <div class="head-controls"><button class="close gear" id="settingsToggle" title="调整布局" aria-label="设置布局">⚙</button>
+          <div class="head-controls">
+             <button type="button" class="wrap-button" id="titleWrap" aria-pressed="false" aria-label="切换标题文字自动换行" title="标题换行开关（提问和回答目录）">↵</button>
+             <button class="close gear" id="settingsToggle" title="调整布局" aria-label="设置布局">⚙</button>
           <button class="close" id="close" aria-label="关闭目录">×</button></div></div>
         <div class="settings" id="settings">
           <label>上下 <input id="layoutY" type="range" min="0" max="80" step="1"><output id="valY"></output></label>
@@ -72,6 +74,18 @@
     jumpTop = shadow.getElementById('jumpTop');
     initializeLayout();
     initializeEnhancements();
+    const wrapButton=shadow.getElementById('titleWrap');
+    const syncTitleWrap=()=>{
+      host.dataset.wrapTitles=wrapTitles?'true':'false';
+      wrapButton.setAttribute('aria-pressed',String(wrapTitles));
+      wrapButton.title=wrapTitles?'标题自动换行已开启；点击恢复截断显示':'标题已截断；点击显示完整文字并自动换行';
+    };
+    syncTitleWrap();
+    wrapButton.addEventListener('click',()=>{
+      wrapTitles=!wrapTitles;
+      try {localStorage.setItem(WRAP_TITLES_KEY,wrapTitles?'1':'0');} catch (_) {}
+      syncTitleWrap();
+    });
 
     shadow.getElementById('launcher').addEventListener('click', () => {
       // The top icon still toggles a locked-open panel.

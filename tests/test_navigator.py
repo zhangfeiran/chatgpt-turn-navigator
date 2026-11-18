@@ -65,7 +65,7 @@ with sync_playwright() as p:
  b=p.chromium.launch(executable_path=CHROMIUM,headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
  h=Harness(b)
  check('four turns detected',h.debug()['displayedTurns']==4)
- check('TOCs collapsed by default',h.debug()['outline']['expanded']==0)
+ check('no manually expanded TOCs at startup',h.debug()['outline']['expanded']==0)
  check('default width and preferred height',h.debug()['panelLayout']['w']==360 and h.debug()['panelLayout']['preferredHeight']==950)
  h.ui('#launcher').click()
  check('panel opens',h.ui('#panel').is_visible())

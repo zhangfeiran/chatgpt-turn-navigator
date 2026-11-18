@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT 轮次导航 / Turn Navigator
 // @namespace    https://chatgpt.com/
-// @version      1.9.3
+// @version      1.9.4
 // @description  Modular local-first navigator: safe virtualized navigation, incremental TOCs, Markdown download/copy, cached-body search and reading resume.
 // @author       ChatGPT
 // @match        https://chatgpt.com/*
@@ -353,6 +353,11 @@
     .turn-group:last-child {border-bottom:0;}
     .answer-outline {margin:2px 0 2px 31px;border-left:1px solid #3b4351;padding-left:5px;}
     .toc-head {display:flex;align-items:center;gap:2px;min-height:29px;}
+    .wrap-button {flex:none;width:27px;height:25px;padding:0;border:1px solid var(--tn-border);
+      border-radius:6px;background:transparent;color:var(--tn-muted);font-size:17px;line-height:1;cursor:pointer;}
+    .wrap-button:hover {background:var(--tn-hover);color:var(--tn-text);}
+    .wrap-button[aria-pressed="true"] {background:#214037;border-color:var(--tn-accent);color:var(--tn-accent);}
+    .toc-row.toc-auto-root > .toc-link {box-shadow:inset 2px 0 #567e76;}
     .toc-toggle {display:flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--tn-muted);padding:4px 3px;min-width:0;flex:1;text-align:left;font-size:11px;border-radius:5px;}
     .toc-toggle:hover,.answer-top:hover,.toc-node-toggle:hover {background:var(--tn-hover);color:var(--tn-text);}
     .toc-count {color:#8995a8;font-size:10px;margin-left:auto;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;}
@@ -372,6 +377,12 @@
     .toc-link.search-selected {outline:1px solid #648875;outline-offset:-1px;background:var(--tn-hover);}
     .toc-level {font-size:9px;font-variant-numeric:tabular-nums;color:#8795a8;flex:none;}
     .toc-text {overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+    /* Opt-in full wrapping for questions and TOC heading labels, not the body. */
+    :host([data-wrap-titles="true"]) .label,
+    :host([data-wrap-titles="true"]) .toc-text {
+      display:block;-webkit-line-clamp:unset;-webkit-box-orient:initial;
+      white-space:normal;overflow:visible;overflow-wrap:anywhere;word-break:break-word;
+    }
     .toc-empty {font-size:11px;color:var(--tn-muted);padding:5px 7px 7px;}
     .toc-link mark {background:#80692a;color:#fff3b4;border-radius:2px;padding:0 1px;}
     button:focus-visible {outline:2px solid var(--tn-accent);outline-offset:-2px;}
@@ -421,7 +432,9 @@
       <section id="panel" aria-label="对话轮次目录">
         <div class="head" id="dragHeader" title="点击固定目录；按住上下拖动">
           <div class="title">☷ 对话目录 <span class="count" id="counter"></span></div>
-          <div class="head-controls"><button class="close gear" id="settingsToggle" title="调整布局" aria-label="设置布局">⚙</button>
+          <div class="head-controls">
+             <button type="button" class="wrap-button" id="titleWrap" aria-pressed="false" aria-label="切换标题文字自动换行" title="标题换行开关（提问和回答目录）">↵</button>
+             <button class="close gear" id="settingsToggle" title="调整布局" aria-label="设置布局">⚙</button>
           <button class="close" id="close" aria-label="关闭目录">×</button></div></div>
         <div class="settings" id="settings">
           <label>上下 <input id="layoutY" type="range" min="0" max="80" step="1"><output id="valY"></output></label>
@@ -476,6 +489,18 @@
     jumpTop = shadow.getElementById('jumpTop');
     initializeLayout();
     initializeEnhancements();
+    const wrapButton=shadow.getElementById('titleWrap');
+    const syncTitleWrap=()=>{
+      host.dataset.wrapTitles=wrapTitles?'true':'false';
+      wrapButton.setAttribute('aria-pressed',String(wrapTitles));
+      wrapButton.title=wrapTitles?'标题自动换行已开启；点击恢复截断显示':'标题已截断；点击显示完整文字并自动换行';
+    };
+    syncTitleWrap();
+    wrapButton.addEventListener('click',()=>{
+      wrapTitles=!wrapTitles;
+      try {localStorage.setItem(WRAP_TITLES_KEY,wrapTitles?'1':'0');} catch (_) {}
+      syncTitleWrap();
+    });
 
     shadow.getElementById('launcher').addEventListener('click', () => {
       // The top icon still toggles a locked-open panel.
@@ -818,11 +843,22 @@
   let expandedAnswers = new Set(), foldedHeadings = new Set(), answerCache = new Map();
   // Per-answer presets expose one, two, or three visible hierarchy levels.
   let answerDepths = new Map();
+  // Default: show root-level headings. Manual closed answers/branches persist;
+  // auto expansion of the currently read root is ephemeral and never persisted.
+  let collapsedAnswers = new Set(), pinnedOpenHeadings = new Set();
+  let activeAutoAnswerKey = '', activeAutoRootKey = '', autoOutlineRaf = 0;
+  const WRAP_TITLES_KEY = 'chatgpt-turn-nav-wrap-titles-v1';
+  let wrapTitles = false;
+  try { wrapTitles = localStorage.getItem(WRAP_TITLES_KEY) === '1'; } catch (_) {}
   let navigationTargets = [], activeSectionKey = '', hintUntil = 0, hintTimer = 0;
 
   function outlineStorageKey() { return OUTLINE_KEY + location.pathname; }
   function loadOutlineState() {
     expandedAnswers = new Set(); foldedHeadings = new Set(); answerDepths = new Map();
+    collapsedAnswers = new Set(); pinnedOpenHeadings = new Set();
+    activeAutoAnswerKey = ''; activeAutoRootKey = '';
+    if (autoOutlineRaf) cancelAnimationFrame(autoOutlineRaf);
+    autoOutlineRaf = 0;
     try {
       const data = JSON.parse(sessionStorage.getItem(outlineStorageKey()) || 'null');
       if (data) {
@@ -832,16 +868,22 @@
           expandedAnswers = new Set((Array.isArray(data.answers) ? data.answers : []).filter(x=>typeof x==='string'));
         foldedHeadings = new Set((Array.isArray(data.headings) ? data.headings : []).filter(x=>typeof x==='string'));
         answerDepths = new Map((Array.isArray(data.depths) ? data.depths : []).filter(x=>
-          Array.isArray(x) && typeof x[0]==='string' && [1,2,3].includes(x[1])));
+          Array.isArray(x) && typeof x[0]==='string' && [1,2,3,6].includes(x[1])));
+        if (data.defaultsVersion === 3) {
+          collapsedAnswers = new Set((Array.isArray(data.collapsedAnswers) ? data.collapsedAnswers : []).filter(x=>typeof x==='string'));
+          pinnedOpenHeadings = new Set((Array.isArray(data.pinnedHeadings) ? data.pinnedHeadings : []).filter(x=>typeof x==='string'));
+        }
       }
     } catch (_) {}
   }
   function saveOutlineState() {
     try {
       sessionStorage.setItem(outlineStorageKey(), JSON.stringify({
-        defaultsVersion:2,
+        defaultsVersion:3,
         answers:[...expandedAnswers].slice(-2000), headings:[...foldedHeadings].slice(-4000),
-        depths:[...answerDepths].slice(-2000)
+        depths:[...answerDepths].slice(-2000),
+        collapsedAnswers:[...collapsedAnswers].slice(-2000),
+        pinnedHeadings:[...pinnedOpenHeadings].slice(-4000)
       }));
     } catch (_) {}
   }
@@ -931,8 +973,17 @@
       for (const a of dom) {
         for (const old of [...cached,...remote].filter(b=>sameAnswer(a,b))) {
           if (expandedAnswers.has(old.key)) expandedAnswers.add(a.key);
+          if (collapsedAnswers.has(old.key)) collapsedAnswers.add(a.key);
           if (answerDepths.has(old.key) && !answerDepths.has(a.key))
             answerDepths.set(a.key,answerDepths.get(old.key));
+          // Reconciliation may replace a DOM answer's identity; transfer pin states
+          // only for matching heading positions/text to prevent pinning a wrong title.
+          for (let hi=0;hi<Math.min(old.headings.length,a.headings.length);hi++) {
+            const from=old.headings[hi],to=a.headings[hi];
+            if(from.level!==to.level || from.text!==to.text) continue;
+            if(pinnedOpenHeadings.has(from.key)) pinnedOpenHeadings.add(to.key);
+            if(foldedHeadings.has(from.key)) foldedHeadings.add(to.key);
+          }
         }
       }
     } else {
@@ -995,44 +1046,65 @@
       return {key:id,ids:[id],node:null,source:'api',headings:[]};
     }
   }
+  function isInHeadingSubtree(answer,heading,rootKey) {
+    let current=heading;
+    while(current) {
+      if(current.key===rootKey) return true;
+      current=current.parent>=0 ? answer.headings[current.parent] : null;
+    }
+    return false;
+  }
   function isOutlineHeadingFolded(answer,heading) {
-    // Presets are relative to the actual heading tree, so an answer starting
-    // at Markdown H2 still has a useful first level when H1 is selected.
+    // Explicit user action always outranks auto-follow (including explicit close).
+    if(foldedHeadings.has(heading.key)) return true;
+    for(const key of pinnedOpenHeadings) {
+      if(key.startsWith(answer.key+'|') && isInHeadingSubtree(answer,heading,key)) return false;
+    }
     const limit=answerDepths.get(answer.key);
-    return limit ? heading.depth >= limit-1 : foldedHeadings.has(heading.key);
+    if(limit) return heading.depth >= limit-1; // Manual H1/H2/H3 choice locks the depth.
+    if(activeAutoAnswerKey===answer.key && activeAutoRootKey &&
+       isInHeadingSubtree(answer,heading,activeAutoRootKey)) return false;
+    return true; // Default H1 outline: show roots, fold their descendants.
   }
   function materializeOutlineDepth(answer) {
-    const limit=answerDepths.get(answer.key);
-    if(!limit) return;
-    for(const h of answer.headings) {
-      if(h.depth >= limit-1) foldedHeadings.add(h.key);
-      else foldedHeadings.delete(h.key);
-    }
+    // Kept as a compatibility helper: manual heading choices no longer destroy
+    // the saved per-answer depth preset.
     answerDepths.delete(answer.key);
   }
   function setAnswerOutlineDepth(answer,depth) {
     if(![1,2,3].includes(depth)) return;
-    // A user-selected preset replaces the temporary expansion caused by search.
     if(lastSearch) {search.value='';lastSearch='';searchSelection=0;}
+    collapsedAnswers.delete(answer.key);
     expandedAnswers.add(answer.key);
-    answerDepths.set(answer.key,depth);
+    // Clicking an already selected preset returns to automatic follow mode.
+    if(answerDepths.get(answer.key)===depth) answerDepths.delete(answer.key);
+    else answerDepths.set(answer.key,depth);
+    for(const h of answer.headings) {
+      foldedHeadings.delete(h.key);pinnedOpenHeadings.delete(h.key);
+    }
     saveOutlineState();renderList();
   }
   function expandAllOutlines(expand) {
     if(!expand && lastSearch) {search.value='';lastSearch='';searchSelection=0;}
     for(const t of turns) for(const a of t.answers||[]) {
-      if(expand) expandedAnswers.add(a.key); else expandedAnswers.delete(a.key);
+      if(expand) {
+        collapsedAnswers.delete(a.key);expandedAnswers.add(a.key);
+        answerDepths.set(a.key,6); // All available heading levels.
+      } else {
+        collapsedAnswers.add(a.key);expandedAnswers.delete(a.key);
+        answerDepths.delete(a.key);
+      }
     }
-    if(expand) {foldedHeadings.clear();answerDepths.clear();}
-    saveOutlineState(); renderList();
-    setHint(expand?'已展开回答目录。点击章节左侧箭头可折叠子章节。':'已折叠全部回答目录。');
+    if(expand) {foldedHeadings.clear();pinnedOpenHeadings.clear();}
+    saveOutlineState();renderList();
+    setHint(expand?'已展开全部回答的章节。':'已折叠全部回答目录。');
   }
   function focusCurrentOutline() {
     if(seekingIndex<0) updateActive();
     for(const a of turns[activeIndex]?.answers||[]) {
-      expandedAnswers.add(a.key);
-      a.headings.forEach(h=>foldedHeadings.delete(h.key));
-      answerDepths.delete(a.key);
+      expandedAnswers.add(a.key);collapsedAnswers.delete(a.key);
+      a.headings.forEach(h=>{foldedHeadings.delete(h.key);pinnedOpenHeadings.delete(h.key);});
+      answerDepths.set(a.key,6);
     }
     search.value=''; lastSearch=''; mountedOnly=false;
     syncFilterButton();
@@ -1065,23 +1137,48 @@
       anonymous:!answer.ids.length,...(h?{text:h.text,level:h.level,occurrence:h.occurrence,sectionKey:h.key}:{})};
   }
   function updateActiveSection() {
-    let current='';
+    let current='', currentAnswer=null, currentHeading=null;
     const timeline=getTimeline();
-    if(timeline) {
+    if(timeline && turns.length) {
       const boundary=timeline.getBoundingClientRect().top+Math.min(120,timeline.clientHeight*.25);
       let top=-Infinity;
-      for(const a of turns[activeIndex]?.answers||[]) for(const h of a.headings) {
-        if(!h.node?.isConnected) continue;
-        const r=h.node.getBoundingClientRect();
-        if(r.height>0 && r.top<=boundary+2 && r.top>top) {top=r.top;current=h.key;}
+      for(const answer of turns[activeIndex]?.answers||[]) {
+        // Don't carry the previous answer's H1 into the next reply.
+        const box=answer.node?.isConnected?answer.node.getBoundingClientRect():null;
+        if(box && (box.bottom<=boundary || box.top>boundary+2)) continue;
+        for(const heading of answer.headings) {
+          if(!heading.node?.isConnected || !timeline.contains(heading.node)) continue;
+          const rect=heading.node.getBoundingClientRect();
+          if(rect.height>0 && rect.top<=boundary+2 && rect.top>top) {
+            top=rect.top;current=heading.key;currentAnswer=answer;currentHeading=heading;
+          }
+        }
       }
     }
     activeSectionKey=current;
-    if(panel.classList.contains('open')) {
+    let rootKey='',answerKey='';
+    if(currentAnswer && currentHeading) {
+      let root=currentHeading;
+      while(root.parent>=0) root=currentAnswer.headings[root.parent];
+      rootKey=root.key;answerKey=currentAnswer.key;
+    }
+    const changed=rootKey!==activeAutoRootKey || answerKey!==activeAutoAnswerKey;
+    activeAutoRootKey=rootKey;activeAutoAnswerKey=answerKey;
+    if(panel?.classList.contains('open')) {
+      const visibleCurrent=list.querySelector('.toc-link[data-section="'+current+'"]');
+      const highlighted=visibleCurrent ? current : rootKey;
       for(const el of list.querySelectorAll('.toc-link')) {
-        const active=el.dataset.section===current;
+        const active=el.dataset.section===highlighted;
         el.classList.toggle('section-active',active);
         if(active) el.setAttribute('aria-current','location');else el.removeAttribute('aria-current');
+      }
+      // One queued list rebuild per root transition. No state is saved, and
+      // scrolling does not override manual choices or move the main transcript.
+      if(changed && !lastSearch && !autoOutlineRaf) {
+        autoOutlineRaf=requestAnimationFrame(()=>{
+          autoOutlineRaf=0;
+          if(panel?.classList.contains('open') && !lastSearch)renderList();
+        });
       }
     }
   }
@@ -2045,7 +2142,7 @@
         }
         if(lastSearch && !turnMatch && !matching.size) return;
         const isSearchOpen=!!lastSearch && (turnMatch||matching.size>0);
-        const open=isSearchOpen || expandedAnswers.has(answer.key);
+        const open=isSearchOpen || !collapsedAnswers.has(answer.key);
         const box=document.createElement('div');box.className='answer-outline';
         const head=document.createElement('div');head.className='toc-head';
         const toggle=document.createElement('button');toggle.type='button';toggle.className='toc-toggle';
@@ -2061,7 +2158,8 @@
             // Search expansion is temporary. Clearing it restores the saved fold states.
             search.value='';lastSearch='';searchSelection=0;
           }
-          if(open) expandedAnswers.delete(answer.key); else expandedAnswers.add(answer.key);
+          if(open) {collapsedAnswers.add(answer.key);expandedAnswers.delete(answer.key);}
+          else {collapsedAnswers.delete(answer.key);expandedAnswers.add(answer.key);}
           saveOutlineState();renderList();
         });
         const top=document.createElement('button');top.type='button';top.className='answer-top';top.textContent='↥';
@@ -2076,9 +2174,9 @@
         depthBar.setAttribute('role','group');depthBar.setAttribute('aria-label','本回答目录展开层级');
         if(answer.headings.length) for(const depth of [1,2,3]) {
           const preset=document.createElement('button');preset.type='button';preset.className='toc-depth-button';
-          preset.textContent=`H${depth}`;preset.title=`展示当前回答的前 ${depth} 层标题（按目录层级，起始标题可能是 H2）`;
+          preset.textContent=`H${depth}`;preset.title=`本回答显示前 ${depth} 层章节。手动选择后保持固定，再次点击可恢复自动跟随`;
           preset.setAttribute('aria-label',`本回答目录展开到第 ${depth} 层`);
-          preset.setAttribute('aria-pressed',String(answerDepths.get(answer.key)===depth));
+          preset.setAttribute('aria-pressed',String(answerDepths.has(answer.key)?answerDepths.get(answer.key)===depth:depth===1));
           preset.dataset.navId=`depth:${answer.key}:${depth}`;
           preset.addEventListener('click',()=>setAnswerOutlineDepth(answer,depth));
           depthBar.append(preset);
@@ -2097,6 +2195,7 @@
               while(p>=0) {if(isOutlineHeadingFolded(answer,answer.headings[p])) return;p=answer.headings[p].parent;}
             }
             const row=document.createElement('div');row.className='toc-row';row.style.paddingLeft=`${Math.min(h.depth,5)*12}px`;
+            if(activeAutoAnswerKey===answer.key && activeAutoRootKey===h.key) row.classList.add('toc-auto-root');
             const hasChildren=answer.headings[hi+1]?.parent===hi;
             const fold=document.createElement(hasChildren?'button':'span');fold.className='toc-node-toggle';
             if(hasChildren) {
@@ -2105,9 +2204,10 @@
               fold.setAttribute('aria-expanded',String(!isOutlineHeadingFolded(answer,h)||!!lastSearch));fold.dataset.navId=`fold:${h.key}`;
               fold.addEventListener('click',()=>{
                 const wasOpen=!isOutlineHeadingFolded(answer,h)||!!lastSearch;
-                if(lastSearch){search.value='';lastSearch='';expandedAnswers.add(answer.key);}
-                materializeOutlineDepth(answer);
-                if(wasOpen) foldedHeadings.add(h.key);else foldedHeadings.delete(h.key);
+                if(lastSearch){search.value='';lastSearch='';expandedAnswers.add(answer.key);collapsedAnswers.delete(answer.key);}
+                // Explicit close/open overrides depth presets and automatic following.
+                if(wasOpen) {foldedHeadings.add(h.key);pinnedOpenHeadings.delete(h.key);}
+                else {pinnedOpenHeadings.add(h.key);foldedHeadings.delete(h.key);}
                 saveOutlineState();renderList();
               });
             } else fold.setAttribute('aria-hidden','true');

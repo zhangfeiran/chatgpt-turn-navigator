@@ -56,3 +56,11 @@
 - Rebase each answer's topmost real Markdown heading to H3, preserving relative heading levels while skipping fenced code, math, quotes and indented code.
 - Do not change single-Q/A or answer-only exports.
 - Keep the single stable `chatgpt-turn-navigator.user.js` installer and modular source in sync.
+
+## v1.9.4 — Reading-follow outline and title wrapping
+
+- Answer TOCs open by default showing top-level headings (H1 in the TOC hierarchy).
+- Auto-expand the currently read root heading's descendants; fold it when reading moves to another root or answer. This ephemeral state is not persisted.
+- Explicitly opened/closed heading branches stay fixed across scrolls and virtualized unmounting. H1/H2/H3 depth presets lock depth; selecting the active preset again restores automatic following.
+- Add a ↵ wrap toggle to the panel header for complete question/heading labels, saved in localStorage.
+- Preserve right-docked layout, Markdown exports, single-file installer and navigation semantics.

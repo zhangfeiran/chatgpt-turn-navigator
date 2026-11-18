@@ -8,6 +8,7 @@ python tests/test_edge_cases.py
 python tests/test_ui_actions.py
 python tests/test_compact_layout.py
 python tests/test_toc_depth.py
+python tests/test_auto_outline.py
 python tests/test_export_headings.py
 ```
 

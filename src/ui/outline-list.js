@@ -85,7 +85,7 @@
         }
         if(lastSearch && !turnMatch && !matching.size) return;
         const isSearchOpen=!!lastSearch && (turnMatch||matching.size>0);
-        const open=isSearchOpen || expandedAnswers.has(answer.key);
+        const open=isSearchOpen || !collapsedAnswers.has(answer.key);
         const box=document.createElement('div');box.className='answer-outline';
         const head=document.createElement('div');head.className='toc-head';
         const toggle=document.createElement('button');toggle.type='button';toggle.className='toc-toggle';
@@ -101,7 +101,8 @@
             // Search expansion is temporary. Clearing it restores the saved fold states.
             search.value='';lastSearch='';searchSelection=0;
           }
-          if(open) expandedAnswers.delete(answer.key); else expandedAnswers.add(answer.key);
+          if(open) {collapsedAnswers.add(answer.key);expandedAnswers.delete(answer.key);}
+          else {collapsedAnswers.delete(answer.key);expandedAnswers.add(answer.key);}
           saveOutlineState();renderList();
         });
         const top=document.createElement('button');top.type='button';top.className='answer-top';top.textContent='↥';
@@ -116,9 +117,9 @@
         depthBar.setAttribute('role','group');depthBar.setAttribute('aria-label','本回答目录展开层级');
         if(answer.headings.length) for(const depth of [1,2,3]) {
           const preset=document.createElement('button');preset.type='button';preset.className='toc-depth-button';
-          preset.textContent=`H${depth}`;preset.title=`展示当前回答的前 ${depth} 层标题（按目录层级，起始标题可能是 H2）`;
+          preset.textContent=`H${depth}`;preset.title=`本回答显示前 ${depth} 层章节。手动选择后保持固定，再次点击可恢复自动跟随`;
           preset.setAttribute('aria-label',`本回答目录展开到第 ${depth} 层`);
-          preset.setAttribute('aria-pressed',String(answerDepths.get(answer.key)===depth));
+          preset.setAttribute('aria-pressed',String(answerDepths.has(answer.key)?answerDepths.get(answer.key)===depth:depth===1));
           preset.dataset.navId=`depth:${answer.key}:${depth}`;
           preset.addEventListener('click',()=>setAnswerOutlineDepth(answer,depth));
           depthBar.append(preset);
@@ -137,6 +138,7 @@
               while(p>=0) {if(isOutlineHeadingFolded(answer,answer.headings[p])) return;p=answer.headings[p].parent;}
             }
             const row=document.createElement('div');row.className='toc-row';row.style.paddingLeft=`${Math.min(h.depth,5)*12}px`;
+            if(activeAutoAnswerKey===answer.key && activeAutoRootKey===h.key) row.classList.add('toc-auto-root');
             const hasChildren=answer.headings[hi+1]?.parent===hi;
             const fold=document.createElement(hasChildren?'button':'span');fold.className='toc-node-toggle';
             if(hasChildren) {
@@ -145,9 +147,10 @@
               fold.setAttribute('aria-expanded',String(!isOutlineHeadingFolded(answer,h)||!!lastSearch));fold.dataset.navId=`fold:${h.key}`;
               fold.addEventListener('click',()=>{
                 const wasOpen=!isOutlineHeadingFolded(answer,h)||!!lastSearch;
-                if(lastSearch){search.value='';lastSearch='';expandedAnswers.add(answer.key);}
-                materializeOutlineDepth(answer);
-                if(wasOpen) foldedHeadings.add(h.key);else foldedHeadings.delete(h.key);
+                if(lastSearch){search.value='';lastSearch='';expandedAnswers.add(answer.key);collapsedAnswers.delete(answer.key);}
+                // Explicit close/open overrides depth presets and automatic following.
+                if(wasOpen) {foldedHeadings.add(h.key);pinnedOpenHeadings.delete(h.key);}
+                else {pinnedOpenHeadings.add(h.key);foldedHeadings.delete(h.key);}
                 saveOutlineState();renderList();
               });
             } else fold.setAttribute('aria-hidden','true');

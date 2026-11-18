@@ -16,7 +16,7 @@ An independent **Tampermonkey userscript** for navigating long ChatGPT conversat
 ## Features
 
 - Navigate conversation turns, including scheduled assistant-only replies.
-- Expand and collapse an outline for each answer. All answer outlines are collapsed by default. Use each answer’s H1/H2/H3 presets to show one, two, or three outline levels (even if Markdown begins at H2).
+- Expand and collapse an outline for each answer. Answer outlines show top-level headings by default. As you scroll, the active root's descendants expand automatically and fold when you leave; manually opened or closed branches persist. H1/H2/H3 buttons lock an answer's depth; click the active preset again to resume auto-follow. The ↵ button toggles full wrapping of question and TOC heading labels.
 - Retain known turns when long conversations virtualize off-screen messages; mounted turns are highlighted.
 - Jump to cached positions of off-screen turns, with a manual scan for correcting uncertain order.
 - Search questions and answer headings, or search the currently cached answer text.
