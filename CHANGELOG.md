@@ -71,3 +71,11 @@
 - Scrolling never opens a closed answer's TOC; H1/H2/H3 controls still explicitly open and set its depth.
 - Correctly restore saved v1.9.4 manually expanded answers after refresh (defaultsVersion 3).
 - Retain title wrapping, manual branch pins, Markdown export, and the stable installer path.
+
+## v1.9.6 — Restore source code in Markdown exports
+
+- Recognize modern ChatGPT code-block markers and prefer the original `data-chatgpt-copy-code` source, including when the code viewer is absent.
+- Recover language tags from code metadata or the marked action bar; exclude toolbar labels from exported Markdown.
+- Preserve whitespace, line breaks and nested backticks. Support conventional pre/code and marked editor fallbacks.
+- Mark unavailable or potentially partial code explicitly; observe copy-source attribute changes and retry incomplete mounted snapshots on export.
+- Keep download/copy modes, TOC behavior and the stable installer path.

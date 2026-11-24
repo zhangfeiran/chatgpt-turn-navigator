@@ -28,7 +28,8 @@
       if(next) {
         bodyObserver.observe(next,{childList:true,subtree:true,characterData:true,attributes:true,
           attributeFilter:['data-turn','data-role','data-turn-key','data-user-message-bubble','data-message-author-role',
-            'data-testid','class','data-is-streaming','data-message-status','data-talvt-turn-state','data-response-body','data-chatgpt-search-message-ids']});
+            'data-testid','class','data-is-streaming','data-message-status','data-talvt-turn-state','data-response-body','data-chatgpt-search-message-ids',
+            'data-chatgpt-copy-code','data-code-block','data-markdown-copy','data-code-language','data-language','data-lang']});
         resize.observe(next);
       }
       geometry.invalidate('timeline replaced');return true;

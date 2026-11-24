@@ -46,6 +46,10 @@ Only for whole-conversation copy/download: the conversation title stays at `#`, 
 
 Clicking the directory keeps it open; hovering opens it temporarily. Drag the header vertically, resize from the bottom-left.
 
+## Code block exports (v1.9.6)
+
+Markdown copy/download prefers the complete copy-source attribute on ChatGPT code blocks, with fallbacks for conventional code viewers and editors. Language, indentation, line breaks and literal characters are preserved; action-bar labels are excluded. If source is missing or only a virtualized editor viewport can be read, the export is explicitly marked partial.
+
 ## Privacy and limitations
 
 The script contains **no analytics, no third-party uploads, and no account information**. Any optional history requests use the same origin as the current ChatGPT page. The browser keeps layout settings and limited reading-point metadata locally; it does **not** persist full conversation text across sessions.

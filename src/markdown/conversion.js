@@ -40,14 +40,75 @@
     const pad=/^`|`$|^ .* $/.test(text)?' ':'';
     return fence+pad+text+pad+fence;
   }
+  const EXPORT_CODE_BLOCK_SELECTOR='[data-chatgpt-copy-code],[data-markdown-copy="code-block"],[data-code-block]:not([data-code-block="false"]),pre';
+  function exportCodeText(node) {
+    // Syntax-highlighted spans are presentation; preserve literal whitespace and BRs.
+    if(!node.querySelector('br')) return node.textContent||'';
+    const read=n=>n.nodeType===3?n.nodeValue||'':n.nodeType!==1?'':n.tagName==='BR'?'\n':[...n.childNodes].map(read).join('');
+    return read(node);
+  }
+  function exportCodeLanguage(root,source) {
+    const normalize=value=>{
+      const v=String(value||'').trim().toLowerCase();
+      const aliases={'c++':'cpp','c#':'csharp','f#':'fsharp','plain text':'text','plaintext':'text','shell script':'bash','shell':'bash','powershell':'powershell','code':'','代码':'','text only':'text'};
+      return Object.prototype.hasOwnProperty.call(aliases,v)?aliases[v]:/^[\w+.#-]+$/.test(v)?v:'';
+    };
+    const candidates=[source,root,root.querySelector('[data-code-language],[data-language],[data-lang]'),root.querySelector('pre'),root.querySelector('code')].filter(Boolean);
+    for(const el of candidates) {
+      for(const key of ['data-code-language','data-language','data-lang']) {
+        const lang=normalize(el.getAttribute(key));if(lang)return lang;
+      }
+      const lang=normalize((el.getAttribute('class')||'').match(/(?:^|\s)(?:language|lang)-([\w+.#-]+)/)?.[1]);
+      if(lang)return lang;
+    }
+    // The saved ChatGPT CodeSurface has a language label in its excluded action bar.
+    const label=root.querySelector('[data-markdown-copy="exclude"] .truncate,[class*="ActionBar-"] .truncate');
+    return normalize(label?.textContent);
+  }
+  function exportCodeBlock(root) {
+    const rawNode=root.hasAttribute('data-chatgpt-copy-code')?root:root.querySelector('[data-chatgpt-copy-code]');
+    const pre=root.matches('pre')?root:root.querySelector('pre');
+    const code=pre?.querySelector('code')||pre||root.querySelector('code');
+    const lang=exportCodeLanguage(root,code||rawNode);
+    // The copy-source attribute contains the complete original text, including
+    // code that is not mounted in the viewer. Read it before ignoring UI/editor nodes.
+    const raw=rawNode?.getAttribute('data-chatgpt-copy-code');
+    if(raw!=null && raw!=='') return {markdown:exportFence(raw,lang),incomplete:false};
+    if(code) {
+      const text=exportCodeText(code);
+      if(text!=='' || root.matches('pre')) return {markdown:exportFence(text,lang),incomplete:false};
+    }
+    const editor=root.querySelector('.cm-editor,.monaco-editor,.cm-content,.view-lines');
+    if(!editor) {
+      const field=root.querySelector('textarea');
+      if(field && !field.closest('[data-markdown-copy="exclude"],[role="toolbar"]') && field.value!=='')
+        return {markdown:exportFence(field.value,lang),incomplete:false};
+      const editable=root.querySelector('[contenteditable="true"]');
+      if(editable && !editable.closest('[data-markdown-copy="exclude"],[role="toolbar"]')) {
+        const text=editable.innerText||exportCodeText(editable);
+        if(text!=='') return {markdown:exportFence(text,lang),incomplete:true};
+      }
+    } else {
+      // CodeMirror/Monaco can virtualize lines. Never represent their mounted
+      // viewport as a verified complete source file without a raw copy attribute.
+      const lines=[...editor.querySelectorAll('.cm-line,.view-line')];
+      if(lines.length) return {markdown:exportFence(lines.map(exportCodeText).join('\n'),lang),incomplete:true};
+    }
+    return {markdown:`> [代码块源码未取得${lang?'（'+lang+'）':''}；请在原对话加载该代码块后重试。]`,incomplete:true};
+  }
   function exportMarkdownDOM(root) {
-    const notes=new Set();
+    const notes=new Set();let codeIncomplete=false;
     const ignored='script,style,noscript,template,button,textarea,input,select,svg,nav,aside,'+
-      '[role="menu"],[role="toolbar"],.sr-only,[hidden],[aria-hidden="true"],[contenteditable="true"]';
+      '[role="menu"],[role="toolbar"],.sr-only,[hidden],[aria-hidden="true"],[contenteditable="true"],[data-markdown-copy="exclude"]';
     const walk=node=>{
       if(node.nodeType===3) return exportEscape((node.nodeValue||'').replace(/\s+/g,' '));
       if(node.nodeType!==1) return '';
       const tag=node.tagName.toLowerCase();
+      if(node.matches(EXPORT_CODE_BLOCK_SELECTOR) && !node.matches('[data-markdown-copy="exclude"],[hidden],[aria-hidden="true"]')) {
+        const block=exportCodeBlock(node);
+        if(block.incomplete) {codeIncomplete=true;notes.add('部分代码块源码未完整取得；仅导出了可取得的源码或缺失提示。');}
+        return '\n\n'+block.markdown+'\n\n';
+      }
       if(node.hasAttribute('data-math-source')) {
         const tex=node.getAttribute('data-math-source')||'';
         return node.getAttribute('data-math-display')==='true'?'\n\n$$\n'+tex+'\n$$\n\n':'$'+tex+'$';
@@ -66,12 +127,6 @@
       }
       if(node.matches(ignored)) return '';
       const children=()=>[...node.childNodes].map(walk).join('');
-      if(tag==='pre') {
-        const code=node.querySelector('code');
-        const text=(code||node).textContent||'';
-        const lang=(code?.className||'').match(/language-([\w+.#-]+)/)?.[1] || node.getAttribute('data-language')||'';
-        return '\n\n'+exportFence(text,lang)+'\n\n';
-      }
       if(tag==='code'||node.matches('[data-markdown-copy="inline-code"]')) return exportInlineCode(node.textContent||'');
       if(tag==='br') return '  \n';
       if(tag==='hr') return '\n\n---\n\n';
@@ -145,7 +200,7 @@
       if(!fence && !line.trim() && out.length>=2 && !out.at(-1).trim() && !out.at(-2).trim()) continue;
       out.push(line);
     }
-    return {markdown:out.join('\n'),notes:[...notes],source:'dom'};
+    return {markdown:out.join('\n'),notes:[...notes],source:'dom',codeIncomplete};
   }
   function exportAPIBody(item) {
     const message=item?.message||item,content=message?.content;
@@ -227,7 +282,7 @@
     if(!node?.isConnected) return null;
     const signature=contentTracker.version(node);
     const prev=exportDOMMemo.get(node);
-    if(prev?.signature===signature && prev.kind===kind) return prev.body;
+    if(prev?.signature===signature && prev.kind===kind && !(exportBusy && prev.body.codeIncomplete)) return prev.body;
     contentTracker.metrics.bodyBuilds++;exportContentRevision++;
     let body;
     if(kind==='user') {
@@ -243,7 +298,7 @@
       if(node.matches(BODY_SELECTOR)) roots=[node];
       const pieces=(roots.length?roots:[node]).map(exportMarkdownDOM);
       body={markdown:pieces.map(p=>p.markdown).filter(Boolean).join('\n\n'),
-        notes:exportUnique(pieces.flatMap(p=>p.notes)),source:'dom'};
+        notes:exportUnique(pieces.flatMap(p=>p.notes)),source:'dom',codeIncomplete:pieces.some(p=>p.codeIncomplete)};
     }
     // Keep only strings and scalars. No disconnected DOM trees in content caches.
     body.observedAt=Date.now();
@@ -355,6 +410,7 @@
     if(!answers.length) content.push(wholeConversation?'**回答**':'### 回答','> [回答尚未生成或正文未取得；请在原对话核对。]');
     const bodies=[...answers,...(turn.role==='user'&&!answerSelection&&question?[question]:[])];
     if(bodies.some(b=>b.source==='dom')) notes.push('部分正文由页面转换为 Markdown，复杂卡片或特殊排版可能简化。');
+    if(bodies.some(b=>b.codeIncomplete)) missing.push('代码块源码未完整取得');
     if(bodies.some(b=>b.unfinished)) {notes.push('导出时部分回答尚在生成，仅包含此刻可取得的内容。');missing.push('回答尚在生成');}
     return {markdown:content.join('\n\n'),notes:exportUnique(notes),missing:exportUnique(missing)};
   }
