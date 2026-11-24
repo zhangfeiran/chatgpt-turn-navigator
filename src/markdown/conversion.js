@@ -96,6 +96,43 @@
     }
     return {markdown:`> [代码块源码未取得${lang?'（'+lang+'）':''}；请在原对话加载该代码块后重试。]`,incomplete:true};
   }
+  // Preserve adjacent inline emphasis as one span instead of emitting ****.
+  function exportInlineEmphasis(node) {
+    if(node.nodeType!==1 || node.matches('[hidden],[aria-hidden="true"],[data-markdown-copy="exclude"]'))return '';
+    const tag=node.tagName.toLowerCase();
+    return /^(strong|b)$/.test(tag)?'**':/^(em|i)$/.test(tag)?'*':/^(del|s)$/.test(tag)?'~~':'';
+  }
+  function exportMarkdownChildren(node,walk) {
+    const out=[];let previous='';
+    for(const child of node.childNodes) {
+      const text=walk(child);if(!text)continue;
+      const delimiter=exportInlineEmphasis(child);
+      const prior=out[out.length-1];
+      if(delimiter && previous===delimiter && prior?.endsWith(delimiter) && text.startsWith(delimiter))
+        out[out.length-1]=prior.slice(0,-delimiter.length)+text.slice(delimiter.length);
+      else out.push(text);
+      previous=delimiter;
+    }
+    return out.join('');
+  }
+  function normalizeExportBlockSpacing(raw) {
+    let fence=null,math=false;
+    const out=[];
+    for(const line of raw.split('\n')) {
+      if(fence) {
+        const end=line.match(/^\s*(`{3,}|~{3,})[ \t]*$/);
+        if(end&&end[1][0]===fence.char&&end[1].length>=fence.size)fence=null;
+        out.push(line);continue;
+      }
+      if(/^\s*\$\$\s*$/.test(line)){math=!math;out.push(line);continue;}
+      if(math){out.push(line);continue;}
+      const m=line.match(/^\s*(`{3,}|~{3,})(.*)$/);
+      if(m){fence={char:m[1][0],size:m[1].length};out.push(line);continue;}
+      if(!line.trim() && out.length && !out.at(-1).trim())continue;
+      out.push(line);
+    }
+    return out.join('\n');
+  }
   function exportMarkdownDOM(root) {
     const notes=new Set();let codeIncomplete=false;
     const ignored='script,style,noscript,template,button,textarea,input,select,svg,nav,aside,'+
@@ -104,6 +141,12 @@
       if(node.nodeType===3) return exportEscape((node.nodeValue||'').replace(/\s+/g,' '));
       if(node.nodeType!==1) return '';
       const tag=node.tagName.toLowerCase();
+      if(isExportMermaidWidget(node) && !node.matches('[data-markdown-copy="exclude"],[hidden],[aria-hidden="true"]')) {
+        const block=exportMermaidWidget(node);
+        if(block.incomplete)codeIncomplete=true;
+        for(const note of block.notes)notes.add(note);
+        return '\n\n'+block.markdown+'\n\n';
+      }
       if(node.matches(EXPORT_CODE_BLOCK_SELECTOR) && !node.matches('[data-markdown-copy="exclude"],[hidden],[aria-hidden="true"]')) {
         const block=exportCodeBlock(node);
         if(block.incomplete) {codeIncomplete=true;notes.add('部分代码块源码未完整取得；仅导出了可取得的源码或缺失提示。');}
@@ -126,7 +169,7 @@
         if(node.matches('[data-testid*="citation"],[data-citation-id]')) notes.add('部分引用控件未提供可导出的来源链接，请回原对话查看。');
       }
       if(node.matches(ignored)) return '';
-      const children=()=>[...node.childNodes].map(walk).join('');
+      const children=()=>exportMarkdownChildren(node,walk);
       if(tag==='code'||node.matches('[data-markdown-copy="inline-code"]')) return exportInlineCode(node.textContent||'');
       if(tag==='br') return '  \n';
       if(tag==='hr') return '\n\n---\n\n';
@@ -186,21 +229,8 @@
       if(/^(p|div|section|article|figure|figcaption|details|dl|dt|dd)$/.test(tag)) return '\n\n'+body.trim()+'\n\n';
       return body;
     };
-    // Preserve code blocks byte-for-byte; normalize only surrounding block spacing.
-    const raw=walk(root).trim();
-    let fence=null;
-    const lines=raw.split('\n'),out=[];
-    for(const line of lines) {
-      const m=line.match(/^\s*(`{3,}|~{3,})/);
-      if(m) {
-        if(!fence) fence={char:m[1][0],size:m[1].length};
-        else if(m[1][0]===fence.char && m[1].length>=fence.size) fence=null;
-        out.push(line);continue;
-      }
-      if(!fence && !line.trim() && out.length>=2 && !out.at(-1).trim() && !out.at(-2).trim()) continue;
-      out.push(line);
-    }
-    return {markdown:out.join('\n'),notes:[...notes],source:'dom',codeIncomplete};
+    // Normalize only prose spacing, never literal code or display math.
+    return {markdown:normalizeExportBlockSpacing(walk(root).trim()),notes:[...notes],source:'dom',codeIncomplete};
   }
   function exportAPIBody(item) {
     const message=item?.message||item,content=message?.content;

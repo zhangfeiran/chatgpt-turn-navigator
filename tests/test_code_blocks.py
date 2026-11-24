@@ -6,7 +6,7 @@ import shutil, os
 
 ROOT=Path(__file__).resolve().parents[1]
 source=(ROOT/'src/markdown/conversion.js').read_text(encoding='utf-8')
-converter=source[:source.index('  function exportAPIBody')]
+converter=(ROOT/'src/markdown/mermaid.js').read_text(encoding='utf-8')+source[:source.index('  function exportAPIBody')]
 CHROMIUM=os.environ.get('CHROMIUM_BIN') or shutil.which('chromium') or shutil.which('chromium-browser')
 checks=[]
 def check(name,condition):

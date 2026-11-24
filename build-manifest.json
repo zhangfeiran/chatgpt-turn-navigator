@@ -1,5 +1,5 @@
 {
-  "version": "1.9.6",
+  "version": "1.9.7",
   "prefix": "src/prefix.js",
   "suffix": "src/suffix.js",
   "modules": [
@@ -13,6 +13,7 @@
     "src/ui/panel.js",
     "src/adapters/dom.js",
     "src/outline/outline.js",
+    "src/markdown/mermaid.js",
     "src/markdown/conversion.js",
     "src/markdown/actions.js",
     "src/app/diagnostics.js",

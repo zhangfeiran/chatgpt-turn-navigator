@@ -29,7 +29,8 @@
         bodyObserver.observe(next,{childList:true,subtree:true,characterData:true,attributes:true,
           attributeFilter:['data-turn','data-role','data-turn-key','data-user-message-bubble','data-message-author-role',
             'data-testid','class','data-is-streaming','data-message-status','data-talvt-turn-state','data-response-body','data-chatgpt-search-message-ids',
-            'data-chatgpt-copy-code','data-code-block','data-markdown-copy','data-code-language','data-language','data-lang']});
+            'data-chatgpt-copy-code','data-code-block','data-markdown-copy','data-code-language','data-language','data-lang',
+            'data-chatgpt-mermaid-preview','data-code-block-preview-pane','data-code-block-source','data-mermaid-source','data-diagram-source','data-mermaid-render-status','data-client-defined-widget']});
         resize.observe(next);
       }
       geometry.invalidate('timeline replaced');return true;

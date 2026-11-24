@@ -50,6 +50,12 @@ Clicking the directory keeps it open; hovering opens it temporarily. Drag the he
 
 Markdown copy/download prefers the complete copy-source attribute on ChatGPT code blocks, with fallbacks for conventional code viewers and editors. Language, indentation, line breaks and literal characters are preserved; action-bar labels are excluded. If source is missing or only a virtualized editor viewport can be read, the export is explicitly marked partial.
 
+## Mermaid and Markdown formatting (v1.9.7)
+
+Mermaid previews prefer original source from explicit source attributes, source views, or best-effort read-only local widget props, and export it in a `mermaid` fence. When only rendered SVG is available, supported simple flowcharts can be reconstructed with a clearly marked partial-source notice. Unsupported graphs receive an explicit missing-source notice, not fabricated code. The exporter does not open widget menus, read the clipboard, or inspect other messages.
+
+DOM conversion also merges adjacent matching emphasis spans and removes excessive inter-paragraph blank lines, preserving literal code and display-math whitespace.
+
 ## Privacy and limitations
 
 The script contains **no analytics, no third-party uploads, and no account information**. Any optional history requests use the same origin as the current ChatGPT page. The browser keeps layout settings and limited reading-point metadata locally; it does **not** persist full conversation text across sessions.

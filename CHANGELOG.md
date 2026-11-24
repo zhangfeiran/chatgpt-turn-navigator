@@ -79,3 +79,12 @@
 - Preserve whitespace, line breaks and nested backticks. Support conventional pre/code and marked editor fallbacks.
 - Mark unavailable or potentially partial code explicitly; observe copy-source attribute changes and retry incomplete mounted snapshots on export.
 - Keep download/copy modes, TOC behavior and the stable installer path.
+
+## v1.9.7 — Mermaid source and cleaner Markdown
+
+- Recognize Mermaid preview widgets independently of ordinary code blocks.
+- Prefer available original diagram source; optionally inspect only local widget props with bounded, read-only traversal.
+- Reconstruct supported simple flowchart nodes and directed edges from SVG when original source is unavailable, explicitly mark the result partial, and report unsupported previews as missing source.
+- Keep diagrams as fenced `mermaid` blocks; do not leak SVG styles or toolbar labels into Markdown.
+- Normalize redundant inter-paragraph blank lines and merge adjacent same-type emphasis spans without changing code or display-math contents.
+- Observe diagram/source attribute changes and add synthetic regression tests.
