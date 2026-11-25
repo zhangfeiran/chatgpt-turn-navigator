@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT 轮次导航 / Turn Navigator
 // @namespace    https://chatgpt.com/
-// @version      1.9.7
+// @version      1.9.8
 // @description  Modular local-first navigator: safe virtualized navigation, incremental TOCs, Markdown download/copy, cached-body search and reading resume.
 // @author       ChatGPT
 // @match        https://chatgpt.com/*
@@ -2559,10 +2559,17 @@
     const reversed = getComputedStyle(scroller).flexDirection === 'column-reverse';
     return {min: reversed ? -overflow : 0, max: reversed ? 0 : overflow, reversed};
   }
-  function scrollWithinTimeline(node,smooth=false,token=navigation.current,offset=0) {
+  function timelineJumpInset(scroller,reading=false) {
+    // Keep the target below ChatGPT's sticky/faded header. Leave a small
+    // margin before the existing active-heading tracking boundary (120px).
+    // Short viewports use a proportionally smaller gap. Saved reading offsets
+    // still use their original 26px reference, including records from older versions.
+    return reading ? 26 : Math.max(26, Math.min(112, Math.floor(scroller.clientHeight*.25)-8));
+  }
+  function scrollWithinTimeline(node,smooth=false,token=navigation.current,offset=0,reading=false) {
     const scroller=getTimeline();if(!scroller||!node?.isConnected||!scroller.contains(node))return false;
     const r=node.getBoundingClientRect(),box=scroller.getBoundingClientRect();if(r.height<1)return false;
-    return navigation.write(token,scroller,scroller.scrollTop+r.top-box.top-26+offset);
+    return navigation.write(token,scroller,scroller.scrollTop+r.top-box.top-timelineJumpInset(scroller,reading)+offset);
   }
 
   function findMountedTurn(turn) {
@@ -2620,7 +2627,7 @@
         if(!navigation.live(token)||!scroller.isConnected)return false;
         safeUpdate(false);
         const node=resolve();
-        if(node&&scrollWithinTimeline(node,false,token,options.reading?.offset||0)) {
+        if(node&&scrollWithinTimeline(node,false,token,options.reading?.offset||0,!!options.reading)) {
           if(highlight){const outline=node.style.outline,offset=node.style.outlineOffset;
             node.style.outline='2px solid #52d4aa';node.style.outlineOffset='3px';
             setTimeout(()=>{if(node.isConnected){node.style.outline=outline;node.style.outlineOffset=offset;}},1400);}
@@ -2632,7 +2639,7 @@
         const bounds=scrollBounds(scroller),turn=getTurn(),point=geometry.get(turn,turnIds)||geometry.get(turn,turnIds,false);
         const knownShell=findMountedTurn(turn);
         if(center===null) {
-          center=options.reading?.top??(point?point.top-26:null);
+          center=options.reading?.top??(point?point.top-timelineJumpInset(scroller,!!options.reading):null);
           if(center===null) {
             const now=turns.findIndex(t=>turnIds(t).some(id=>wantedIds.includes(id)));
             const anchors=turns.map((t,i)=>({i,p:geometry.get(t,turnIds)})).filter(x=>x.p);
@@ -2649,7 +2656,7 @@
           // The right message has mounted, but a requested heading may still be
           // streaming. Wait here rather than bouncing to another turn.
           const r=knownShell.getBoundingClientRect(),box=scroller.getBoundingClientRect();
-          destination=scroller.scrollTop+r.top-box.top-26;
+          destination=scroller.scrollTop+r.top-box.top-timelineJumpInset(scroller,!!options.reading);
         } else if(attempt<3) destination=center;
         else {
           // Local expansion is bounded and never repeatedly alternates endpoints.

@@ -88,3 +88,9 @@
 - Keep diagrams as fenced `mermaid` blocks; do not leak SVG styles or toolbar labels into Markdown.
 - Normalize redundant inter-paragraph blank lines and merge adjacent same-type emphasis spans without changing code or display-math contents.
 - Observe diagram/source attribute changes and add synthetic regression tests.
+
+## v1.9.8 — Clearer TOC jump positioning
+
+- Increase the normal transcript jump clearance from 26px to up to 112px, with an adaptive reduction for short viewports, keeping targets clear of the top overlay.
+- Apply the same clearance when seeking unmounted turns or waiting for headings to load. Keep saved reading/return offsets compatible with the original 26px anchor.
+- Preserve the existing active-section tracking and navigation cancellation.

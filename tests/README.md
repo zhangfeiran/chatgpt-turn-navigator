@@ -19,3 +19,9 @@ python tests/test_mermaid.py
 `NAV_FIXTURES` 可指向含 `nov_saved.html`、`oct_saved.html`、`scheduled_saved.html` 的私有结构 fixture 文件夹。这些用户页面不随安装包发布；未提供时，跳过对应实际 HTML 测试，不伪造通过记录。
 
 测试输出在 `test-output/`。仅测试期间在内存源码中加入路由、存储和函数入口替身；这些入口不在安装脚本中。
+
+`test_jump_clearance.py` verifies the TOC jump margin and preservation of saved reading offsets:
+
+```sh
+python tests/test_jump_clearance.py
+```
