@@ -13,6 +13,14 @@ First install the [Tampermonkey extension](https://www.tampermonkey.net/) if nee
 
 An independent **Tampermonkey userscript** for navigating long ChatGPT conversations. It provides a dark, right-docked, resizable table of contents with per-answer headings and Markdown export. This project is not affiliated with OpenAI.
 
+## Automatic local Markdown archive (v2.0.0)
+
+Open the navigator's settings and select a dedicated local directory to opt in. The script creates a ChatGPT Markdown subdirectory, then one folder per conversation (title plus stable conversation ID), a Markdown file for each obtained Q/A or standalone assistant reply, and an _index.md file. Filenames retain their initial archive sequence and answer ID; indexes show the known current order. The archive reuses the existing Markdown conversion (including code, math and Mermaid).
+
+Sync waits for generation to finish and content to settle. Unchanged files are not rewritten. Regenerated answers with different IDs remain separate. A managed-file marker and SHA-256 content check protect user-edited and unrelated files; incomplete snapshots do not overwrite better archives. Pause, resume/authorize, sync now, and unlink are available in settings. Unlink does not delete files or revoke site permissions.
+
+Disabled by default. Requires a desktop Chromium browser supporting the File System Access API, Web Locks and Web Crypto. Directory handles and preferences are saved in IndexedDB; the browser may require permission again. Writes across tabs are serialized. Sync is local and one-way, using only obtained content from conversations you open. It does not crawl the account, automatically scan unloaded turns, run after the page closes, or guarantee complete conversation history. Turns without stable IDs or acquired question/answer content are skipped; known partial content is labeled. Select a dedicated private directory.
+
 ## Features
 
 - Navigate conversation turns, including scheduled assistant-only replies.

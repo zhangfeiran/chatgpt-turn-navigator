@@ -30,6 +30,17 @@
           <span class="drag-hint">Alt+Shift+F 搜索 · Alt+Shift+J 显示/隐藏 · Alt+Shift+↑↓ 切换</span>
           <div class="setting-actions"><button type="button" id="rebuildOrder" title="历史接口返回 404 时，依次扫描正文并按实际位置重建顺序；扫描完成后恢复阅读位置">↕ 扫描校正排序</button><button type="button" id="diagnose" title="只复制节点数量，不包含聊天内容">复制诊断</button>
             <button type="button" id="resetLayout">恢复默认布局</button><button type="button" id="clearReading">清除阅读记录</button></div>
+          <div class="archive-settings">
+            <div class="archive-heading">本地 Markdown 自动同步</div>
+            <div id="archiveStatus" class="archive-status" role="status" aria-live="polite"></div>
+            <div class="setting-actions archive-actions">
+              <button type="button" id="archiveChoose" title="选择专用本地目录并开启同步">选择目录</button>
+              <button type="button" id="archiveToggle">恢复/授权</button>
+              <button type="button" id="archiveNow" title="同步当前已取得的对话内容">立即同步</button>
+              <button type="button" id="archiveForget" title="解除本地目录绑定，不删除任何文件">解除绑定</button>
+            </div>
+            <div class="archive-help">授权后同步打开过且已取得正文的私人对话；只写入 ChatGPT Markdown 子目录。关闭网页后不会后台运行。</div>
+          </div>
         </div>
         <input id="search" class="search" placeholder="搜索提问、回答章节或轮次编号…" type="search" aria-label="搜索对话轮次" />
         <div class="compact-toolbar" aria-label="搜索筛选与回答目录操作">
@@ -74,6 +85,7 @@
     jumpTop = shadow.getElementById('jumpTop');
     initializeLayout();
     initializeEnhancements();
+    initializeLocalArchive();
     const wrapButton=shadow.getElementById('titleWrap');
     const syncTitleWrap=()=>{
       host.dataset.wrapTitles=wrapTitles?'true':'false';

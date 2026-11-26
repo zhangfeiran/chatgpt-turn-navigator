@@ -51,6 +51,11 @@
     .setting-actions { display:flex;justify-content:flex-end;gap:5px;flex-wrap:wrap; }
     .setting-actions button {background:var(--tn-hover);border:1px solid var(--tn-border);color:var(--tn-text);border-radius:7px;padding:5px 9px;font-size:11px}
     .setting-actions button:hover {border-color:var(--tn-accent)}
+    .archive-settings {border-top:1px solid var(--tn-border);padding-top:8px;display:grid;gap:6px;min-width:0;}
+    .archive-heading {font-size:12px;font-weight:600;color:var(--tn-text);}
+    .archive-status,.archive-help {font-size:11px;line-height:1.5;color:var(--tn-muted);overflow-wrap:anywhere;}
+    .archive-actions {justify-content:flex-start;}
+    .archive-actions button:disabled {opacity:.45;cursor:not-allowed;}
     .drag-hint {font-size:10px;color:var(--tn-muted);white-space:nowrap;}
     .title { font-weight:680;font-size:14px;display:flex;gap:7px;align-items:center; }
     .count { color:var(--tn-muted);font-size:11px;white-space:nowrap; }

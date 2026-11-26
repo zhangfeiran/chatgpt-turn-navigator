@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT 轮次导航 / Turn Navigator
 // @namespace    https://chatgpt.com/
-// @version      1.9.8
-// @description  Modular local-first navigator: safe virtualized navigation, incremental TOCs, Markdown download/copy, cached-body search and reading resume.
+// @version      2.0.0
+// @description  Modular local-first navigator: safe virtualized navigation, incremental TOCs, Markdown download/copy, cached-body search, reading resume and opt-in local Markdown sync.
 // @author       ChatGPT
 // @match        https://chatgpt.com/*
 // @match        https://www.chatgpt.com/*

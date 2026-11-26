@@ -45,6 +45,7 @@
       if(stopped)return;
       if(location.href!==currentURL||attach())scheduleUpdate();
       if(!document.hidden&&!apiPending&&apiRetryAt&&Date.now()>=apiRetryAt)loadApiIndex();
+      archiveObserve();
     },1200);
     return {
       flush(){if(stopped)return;rootObserver.takeRecords();attach();relevant(bodyObserver.takeRecords());

@@ -94,3 +94,10 @@
 - Increase the normal transcript jump clearance from 26px to up to 112px, with an adaptive reduction for short viewports, keeping targets clear of the top overlay.
 - Apply the same clearance when seeking unmounted turns or waiting for headings to load. Keep saved reading/return offsets compatible with the original 26px anchor.
 - Preserve the existing active-section tracking and navigation cancellation.
+
+## v2.0.0 — Opt-in local Markdown archive
+
+- Add a browser-native local directory binding, pause/resume/authorize, sync-now and unlink controls.
+- Store each obtained Q/A as a separate Markdown file under a stable conversation folder and maintain an index.
+- Wait for generation to settle; use stable UUIDs, a write lock, managed-file hashes and completeness checks to avoid unsafe overwrites. No file deletion or background account crawl.
+- Preserve original navigation and manual export behavior, and expose honest partial-content and permission status.

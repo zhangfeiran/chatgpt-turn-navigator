@@ -56,6 +56,7 @@
       if (panel.classList.contains('open')) renderList();
     }
     updateActive();updateCoverage();syncReadingButton();
+    archiveObserve();
     if (chatId() && !apiPending && apiKey !== `${location.origin}:${chatId()}`) {
       // Read once per conversation, not on every DOM mutation.
       setTimeout(() => loadApiIndex(), 150);

@@ -340,10 +340,20 @@
     const prior=exportDOM.get(turn.key),node=turn.node;
     const user=node.matches(USER_SELECTOR)?node:node.querySelector(USER_SELECTOR);
     const question=user?exportSnapshotNode(user,'user'):prior?.question||null;
+    const streamingSelector='[data-is-streaming="true"],[data-message-status="in_progress"]';
+    // Keep streaming provenance after the DOM virtualizes away, so automatic
+    // archives never mistake a still-generating answer for a final answer.
+    const turnStreaming=node.matches(streamingSelector)||!!node.querySelector(streamingSelector)||
+      (turns.at(-1)===turn && !!document.querySelector('[data-testid="stop-button"],[data-testid="composer-stop-button"]'));
     const answers=(turn.answers||[]).filter(a=>a.node?.isConnected).map(a=>({
-      ...exportSnapshotNode(a.node,'assistant'),id:a.key,ids:exportUnique([a.key,...a.ids]),role:'assistant'
+      ...exportSnapshotNode(a.node,'assistant'),id:a.key,ids:exportUnique([a.key,...a.ids]),role:'assistant',
+      unfinished:turnStreaming||!!a.node.closest(streamingSelector)
     })).filter(a=>a.markdown);
     const snapshot={key:turn.key,ids:turnIds(turn),question,answers:answers.length?answers:prior?.answers||[]};
+    // The final streaming flag can change with no new body text. Treat that
+    // transition as a revision so the local archive rechecks completed turns.
+    if(prior && snapshot.answers.some(a=>prior.answers?.find(b=>b.id===a.id)?.unfinished!==a.unfinished))
+      exportContentRevision++;
     exportDOM.set(turn.key,snapshot);
   }
   function exportFindSnapshot(turn) {

@@ -25,3 +25,7 @@ python tests/test_mermaid.py
 ```sh
 python tests/test_jump_clearance.py
 ```
+
+## Local archive tests
+
+Run `node tests/test_local_archive.mjs` (Node.js 20+; no dependencies). Uses simulated directory handles and injected hash function to check file isolation, incremental writes, conflicts, pause, partial-content protection and batch selection. This does not replace real browser directory-authorization testing.
