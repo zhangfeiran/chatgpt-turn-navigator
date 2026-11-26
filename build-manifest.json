@@ -1,5 +1,5 @@
 {
-  "version": "2.0.1",
+  "version": "2.0.2",
   "prefix": "src/prefix.js",
   "suffix": "src/suffix.js",
   "modules": [

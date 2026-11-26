@@ -109,3 +109,9 @@
 - Keep a scrollable compact rail visible for single-mounted-turn and incomplete-history conversations; use actual scroll bounds and measured ticks, including column-reverse layouts. Preserve verified multi-turn navigation.
 - Keep the export-all footer button icon-only when busy, idle or switching conversations; prevent text overflow.
 - Generate the runtime diagnostic version from the build manifest and include privacy-safe rail and button status diagnostics.
+
+## v2.0.2 — Beijing-time local archives
+
+- Format new local archive filenames in fixed UTC+08:00 using the Windows-safe `+0800` suffix; use `+08:00` in archived message timestamps.
+- Preserve existing numbered and UTC filenames by stable message ID. No automatic renames or duplicate copies.
+- Keep original timestamp instants and explicitly label first-archive-time fallbacks.

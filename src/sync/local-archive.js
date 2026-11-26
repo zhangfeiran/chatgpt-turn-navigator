@@ -183,7 +183,7 @@
       const turnTime=archiveValidTime(turn.time);
       const answerTime=archiveValidTime(anchorTime);
       const messageTime=questionTime??turnTime??answerTime;
-      if(messageTime!==null)body.push('> '+(questionTime!==null?'提问时间':turnTime!==null?'消息时间':'回答时间')+'：'+new Date(messageTime).toISOString());
+      if(messageTime!==null)body.push('> '+(questionTime!==null?'提问时间':turnTime!==null?'消息时间':'回答时间')+'：'+archiveFormatTime(messageTime));
       else body.push('> 原始消息时间未取得；新建文件名使用首次归档时间。');
       if(partial)body.push('> 归档说明：本轮已取得部分内容；不能保证源码、附件或回答完整。');
       if(notes.length)body.push('> '+exportUnique(notes).join('\n> '));

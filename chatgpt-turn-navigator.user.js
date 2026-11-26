@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT 轮次导航 / Turn Navigator
 // @namespace    https://chatgpt.com/
-// @version      2.0.1
+// @version      2.0.2
 // @description  Modular local-first navigator: safe virtualized navigation, incremental TOCs, Markdown download/copy, cached-body search, reading resume and opt-in local Markdown sync.
 // @author       ChatGPT
 // @match        https://chatgpt.com/*
@@ -15,7 +15,7 @@
 
 (() => {
   'use strict';
-  const SCRIPT_VERSION = '2.0.1';
+  const SCRIPT_VERSION = '2.0.2';
   if (window.__chatgptTurnNavLoaded) return;
   window.__chatgptTurnNavLoaded = true;
 
@@ -1867,12 +1867,16 @@
   function archiveValidTime(value) {
     return Number.isFinite(value)&&value>0&&Number.isFinite(new Date(value).getTime())?value:null;
   }
+  // Fixed UTC+08:00, independent of the browser or operating-system time zone.
+  function archiveFormatTime(value) {
+    return new Date(value+8*60*60*1000).toISOString().replace(/Z$/,'+08:00');
+  }
   function archiveTimestampPrefix(record,batch) {
     const messageTime=archiveValidTime(record.messageTime);
     const time=messageTime??archiveValidTime(batch.observedAt)??Date.now();
-    // UTC sorts chronologically even if the computer changes time zones.
+    // Explicit UTC+8 offset, with Windows-compatible filename characters.
     // Mark missing source timestamps instead of fabricating a message time.
-    const stamp=new Date(time).toISOString().slice(0,19).replace('T','_').replace(/:/g,'-')+'Z';
+    const stamp=archiveFormatTime(time).slice(0,19).replace('T','_').replace(/:/g,'-')+'+0800';
     return stamp+(messageTime===null?'_首次归档':'');
   }
   function archiveHash(text) {
@@ -1979,7 +1983,7 @@
     const others=[...files.values()].flat().filter(n=>!included.has(n)).sort();
     const links=names=>names.map(n=>'- ['+archiveSafeMarkdownLabel(n.replace(/ -- [0-9a-f-]{36}\.md$/i,''))+']('+encodeURIComponent(n)+')').join('\n');
     const body='# '+archiveSafeMarkdownLabel(batch.title)+'\n\n> 原对话：'+batch.url+
-      '\n> 当前可取得的轮次，非完整历史证明。新文件名前缀优先使用消息时间（UTC），缺失时标记首次归档时间；旧编号文件保留原名。此索引按本次已知对话顺序排列。\n\n## 本次已知轮次\n\n'+
+      '\n> 当前可取得的轮次，非完整历史证明。新文件名前缀优先使用消息时间（UTC+8，北京时间），缺失时标记首次归档时间；已有编号和 UTC 文件保留原名。此索引按本次已知对话顺序排列。\n\n## 本次已知轮次\n\n'+
       (links(ordered)||'（无）')+'\n\n## 其他已归档文件（含历史或分支）\n\n'+(links(others)||'（无）')+'\n';
     const index=await archiveWriteManaged(dir,'_index.md',{key:'index:'+batch.id,body,quality:'complete',answerIds:[],observedAt:batch.observedAt},live,digest);
     if(index==='conflict')counts.conflict++;
@@ -2172,7 +2176,7 @@
       const turnTime=archiveValidTime(turn.time);
       const answerTime=archiveValidTime(anchorTime);
       const messageTime=questionTime??turnTime??answerTime;
-      if(messageTime!==null)body.push('> '+(questionTime!==null?'提问时间':turnTime!==null?'消息时间':'回答时间')+'：'+new Date(messageTime).toISOString());
+      if(messageTime!==null)body.push('> '+(questionTime!==null?'提问时间':turnTime!==null?'消息时间':'回答时间')+'：'+archiveFormatTime(messageTime));
       else body.push('> 原始消息时间未取得；新建文件名使用首次归档时间。');
       if(partial)body.push('> 归档说明：本轮已取得部分内容；不能保证源码、附件或回答完整。');
       if(notes.length)body.push('> '+exportUnique(notes).join('\n> '));
