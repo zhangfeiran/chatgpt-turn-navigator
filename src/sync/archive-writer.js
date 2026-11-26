@@ -14,6 +14,17 @@
     if(/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(s))s='_'+s;
     return s||'未命名';
   }
+  function archiveValidTime(value) {
+    return Number.isFinite(value)&&value>0&&Number.isFinite(new Date(value).getTime())?value:null;
+  }
+  function archiveTimestampPrefix(record,batch) {
+    const messageTime=archiveValidTime(record.messageTime);
+    const time=messageTime??archiveValidTime(batch.observedAt)??Date.now();
+    // UTC sorts chronologically even if the computer changes time zones.
+    // Mark missing source timestamps instead of fabricating a message time.
+    const stamp=new Date(time).toISOString().slice(0,19).replace('T','_').replace(/:/g,'-')+'Z';
+    return stamp+(messageTime===null?'_首次归档':'');
+  }
   function archiveHash(text) {
     return crypto.subtle.digest('SHA-256',new TextEncoder().encode(text))
       .then(bytes=>Array.from(new Uint8Array(bytes),n=>n.toString(16).padStart(2,'0')).join(''));
@@ -87,13 +98,14 @@
     const counts={created:0,updated:0,unchanged:0,retained:0,conflict:0,partial:0,skipped:batch.skipped||0,cancelled:0};
     if(!batch.records.length||!live())return counts;
     const dir=await archiveConversationDir(root,batch,live);if(!dir)return counts;
-    const files=new Map();let serial=0;
+    const files=new Map();
     for await(const [name,handle] of dir.entries()) {
       if(handle.kind!=='file')continue;
-      const match=name.match(/^(\d{4,}) - .+ -- ([0-9a-f-]{36})\.md$/i);
+      // Existing numbered archives, timestamp archives and renamed files
+      // with the same UUID suffix all retain their original file identity.
+      const match=name.match(/ -- ([0-9a-f-]{36})\.md$/i);
       if(!match)continue;
-      serial=Math.max(serial,Number(match[1])||0);
-      const id=archiveStableId(match[2]);if(!id)continue;
+      const id=archiveStableId(match[1]);if(!id)continue;
       if(!files.has(id))files.set(id,[]);
       files.get(id).push(name);
     }
@@ -103,7 +115,7 @@
       if(record.quality==='partial')counts.partial++;
       const prior=files.get(record.anchorId)||[];
       if(prior.length>1){counts.conflict++;continue;}
-      const name=prior[0]||String(++serial).padStart(4,'0')+' - '+archiveSafeName(record.label)+' -- '+record.anchorId+'.md';
+      const name=prior[0]||archiveTimestampPrefix(record,batch)+' - '+archiveSafeName(record.label)+' -- '+record.anchorId+'.md';
       const result=await archiveWriteManaged(dir,name,record,live,digest);
       counts[result]++;
       if(result==='cancelled')break;
@@ -117,7 +129,7 @@
     const others=[...files.values()].flat().filter(n=>!included.has(n)).sort();
     const links=names=>names.map(n=>'- ['+archiveSafeMarkdownLabel(n.replace(/ -- [0-9a-f-]{36}\.md$/i,''))+']('+encodeURIComponent(n)+')').join('\n');
     const body='# '+archiveSafeMarkdownLabel(batch.title)+'\n\n> 原对话：'+batch.url+
-      '\n> 当前可取得的轮次，非完整历史证明。文件名前缀是首次归档顺序；此索引按本次已知对话顺序排列。\n\n## 本次已知轮次\n\n'+
+      '\n> 当前可取得的轮次，非完整历史证明。新文件名前缀优先使用消息时间（UTC），缺失时标记首次归档时间；旧编号文件保留原名。此索引按本次已知对话顺序排列。\n\n## 本次已知轮次\n\n'+
       (links(ordered)||'（无）')+'\n\n## 其他已归档文件（含历史或分支）\n\n'+(links(others)||'（无）')+'\n';
     const index=await archiveWriteManaged(dir,'_index.md',{key:'index:'+batch.id,body,quality:'complete',answerIds:[],observedAt:batch.observedAt},live,digest);
     if(index==='conflict')counts.conflict++;

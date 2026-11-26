@@ -99,11 +99,12 @@
     .actions {display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;}
     .action {display:flex;align-items:center;justify-content:center;min-width:0;height:30px;
       border:1px solid var(--tn-border);border-radius:6px;background:transparent;
-      color:var(--tn-text);padding:0;font-size:16px;line-height:1;white-space:nowrap;}
+      color:var(--tn-text);padding:0;font-size:16px;line-height:1;white-space:nowrap;overflow:hidden;}
     .action:hover:not(:disabled) { background:var(--tn-hover); }
     .action:disabled {opacity:.4;cursor:not-allowed}
     .empty { color:var(--tn-muted);text-align:center;padding:24px 8px; }
-    :host([data-hidden="true"]) #rail { display:none; }
+    :host([data-hidden="true"]) #rail,
+    :host([data-hidden="true"]) #preview { display:none!important; }
     :host([data-disabled="true"]) #launcher,
     :host([data-disabled="true"]) #rail,
     :host([data-disabled="true"]) #panel,

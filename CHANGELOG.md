@@ -101,3 +101,11 @@
 - Store each obtained Q/A as a separate Markdown file under a stable conversation folder and maintain an index.
 - Wait for generation to settle; use stable UUIDs, a write lock, managed-file hashes and completeness checks to avoid unsafe overwrites. No file deletion or background account crawl.
 - Preserve original navigation and manual export behavior, and expose honest partial-content and permission status.
+
+## v2.0.1 — Timestamped archives and compact rail fixes
+
+- Name new Q/A archives using actual message timestamps (UTC), with a labeled first-archive-time fallback when the source timestamp is unavailable.
+- Preserve existing numbered archives and filenames by UUID; no automatic rename, duplication or deletion. Keep the known-order conversation index.
+- Keep a scrollable compact rail visible for single-mounted-turn and incomplete-history conversations; use actual scroll bounds and measured ticks, including column-reverse layouts. Preserve verified multi-turn navigation.
+- Keep the export-all footer button icon-only when busy, idle or switching conversations; prevent text overflow.
+- Generate the runtime diagnostic version from the build manifest and include privacy-safe rail and button status diagnostics.

@@ -21,5 +21,9 @@ jobs:
         run: python build.py
       - name: Validate JavaScript syntax
         run: node --check chatgpt-turn-navigator.user.js
+      - name: Verify local archive and compact rail logic
+        run: |
+          node tests/test_local_archive.mjs
+          node tests/test_rail_footer.mjs
       - name: Check reproducible output
         run: git diff --exit-code -- chatgpt-turn-navigator.user.js

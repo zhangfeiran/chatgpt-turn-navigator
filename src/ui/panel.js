@@ -1,6 +1,7 @@
   function initUI() {
     host = document.createElement('div');
     host.id = 'chatgpt-turn-nav-userscript';
+    host.dataset.hidden='true';
     shadow = host.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
     style.textContent = styles;
@@ -197,12 +198,14 @@
         updateLayoutPosition(); saveLayout();
       });
     }
-    track.addEventListener('click', event => jumpTo(indexFromPointer(event), true));
+    track.addEventListener('click', event => jumpRailPosition(pointerRailFraction(event)));
     track.addEventListener('keydown', event => {
       if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-        event.preventDefault(); jumpTo(clamp(activeIndex + 1, 0, turns.length - 1), true);
+        event.preventDefault(); railArrow(1);
       } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-        event.preventDefault(); jumpTo(clamp(activeIndex - 1, 0, turns.length - 1), true);
+        event.preventDefault(); railArrow(-1);
+      } else if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault(); jumpRailPosition(event.key==='Home'?0:1);
       } else if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault(); pinned = true; togglePanel(true);
       }

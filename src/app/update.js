@@ -45,17 +45,16 @@
     indexCatalog=turns.map(metadataSnapshot);
     // Retain outlines, not detached DOM trees. The live turns array owns live nodes.
     for(const t of indexCatalog) if(t.answers.length) answerCache.set(t.key,t.answers);
-    host.dataset.hidden = turns.length < 2 ? 'true' : 'false';
     counter.textContent = `${turns.length ? Math.min(activeIndex+1,turns.length) + ' / ' : ''}${turns.length} 轮`;
     const unmounted=turns.filter(t=>!t.node).length, mounted=turns.length-unmounted;
     syncFilterButton();
     // Routine indexing details are available in #coverage and diagnostics, not the footer.
     const fingerprint = (bodySearch&&lastSearch?String(exportContentRevision):'')+turns.map(t => `${t.key}:${t.label}:${t.role}:${!!t.node}:`+(t.answers||[]).map(a=>`${a.key}:${a.source}:`+a.headings.map(h=>`${h.level}:${h.text}:${!!h.node?.isConnected}`).join('|')).join('~')).join('\u0001');
     if (force || fingerprint !== lastFingerprint) {
-      lastFingerprint = fingerprint; renderTicks();
+      lastFingerprint = fingerprint;
       if (panel.classList.contains('open')) renderList();
     }
-    updateActive();updateCoverage();syncReadingButton();
+    renderTicks();updateActive();updateCoverage();syncReadingButton();
     archiveObserve();
     if (chatId() && !apiPending && apiKey !== `${location.origin}:${chatId()}`) {
       // Read once per conversation, not on every DOM mutation.

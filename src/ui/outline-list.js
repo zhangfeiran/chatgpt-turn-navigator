@@ -1,17 +1,83 @@
+  // The compact rail cannot assume that a virtualized DOM represents every
+  // turn. Use physical scroll progress until history is confirmed.
+  let railTickFingerprint='';
+  function railMetrics(scroller=getTimeline()) {
+    const bounds=scroller?scrollBounds(scroller):{min:0,max:0,reversed:false};
+    const span=Math.max(0,bounds.max-bounds.min);
+    const mode=apiComplete&&turns.length>=2?'turns':'scroll';
+    const fraction=span>1?clamp((scroller.scrollTop-bounds.min)/span,0,1):0;
+    return {scroller,bounds,span,mode,fraction,visible:!!scroller&&span>1};
+  }
+  function updateRailProgress(metrics=railMetrics()) {
+    if(!host||!track||!marker)return;
+    const {mode,fraction,visible}=metrics;
+    host.dataset.hidden=visible?'false':'true';
+    rail.dataset.mode=mode;
+    if(!visible){preview.style.display='none';marker.style.top='0%';}
+    const complete=mode==='turns';
+    const value=complete?clamp(activeIndex+1,1,turns.length):Math.round(fraction*100);
+    const display=complete?(turns.length<2?0:(value-1)/(turns.length-1)):fraction;
+    marker.style.top=(visible?display*100:0)+'%';
+    track.setAttribute('aria-valuemin',complete?'1':'0');
+    track.setAttribute('aria-valuemax',complete?String(turns.length):'100');
+    track.setAttribute('aria-valuenow',String(value));
+    track.setAttribute('aria-label',complete?'按轮次跳转对话':'正文滚动进度（历史未确认时按实际位置导航）');
+    track.setAttribute('aria-valuetext',complete?(turns[value-1]?.label||'第 '+value+' 轮'):'正文 '+value+'%（不代表完整轮次）');
+    track.title=complete?'已确认历史：按轮次定位':'按实际滚动位置定位；历史轮次可能尚未加载';
+  }
   function renderTicks() {
-    track.querySelectorAll('.tick').forEach(el => el.remove());
-    const count = turns.length;
-    if (!count) return;
-    const amount = Math.min(CONFIG.maxTicks, count);
-    const fragment = document.createDocumentFragment();
-    for (let i = 0; i < amount; i++) {
-      const tick = document.createElement('div');
-      tick.className = 'tick';
-      tick.style.top = `${amount === 1 ? 0 : i / (amount - 1) * 100}%`;
-      fragment.appendChild(tick);
+    const metrics=railMetrics(),count=turns.length;
+    let positions=[];
+    if(metrics.visible && metrics.mode==='turns'){
+      const amount=Math.min(CONFIG.maxTicks,count);
+      positions=Array.from({length:amount},(_,i)=>amount===1?0:i/(amount-1));
+    } else if(metrics.visible) {
+      // Only show physically measured, current-layout turn anchors; never
+      // distribute a partial index evenly across the entire document.
+      const inset=timelineJumpInset(metrics.scroller);
+      const points=turns.map(t=>geometry.get(t,turnIds)).filter(p=>p&&Number.isFinite(p.top));
+      positions=[...new Set(points.map(p=>Math.round(clamp((p.top-inset-metrics.bounds.min)/metrics.span,0,1)*10000)/10000))].sort((a,b)=>a-b);
+      if(positions.length>CONFIG.maxTicks)positions=Array.from({length:CONFIG.maxTicks},(_,i)=>positions[Math.round(i*(positions.length-1)/(CONFIG.maxTicks-1))]);
     }
-    track.insertBefore(fragment, marker);
-    track.setAttribute('aria-valuemax', String(count));
+    const key=metrics.mode+'|'+metrics.visible+'|'+positions.join(',');
+    if(key!==railTickFingerprint){
+      railTickFingerprint=key;
+      track.querySelectorAll('.tick').forEach(el=>el.remove());
+      const fragment=document.createDocumentFragment();
+      for(const position of positions){
+        const tick=document.createElement('div');tick.className='tick';
+        tick.style.top=(position*100)+'%';fragment.appendChild(tick);
+      }
+      track.insertBefore(fragment,marker);
+    }
+    updateRailProgress(metrics);
+  }
+  function pointerRailFraction(event) {
+    const rect=track.getBoundingClientRect();
+    return clamp((event.clientY-rect.top)/Math.max(rect.height,1),0,1);
+  }
+  function jumpRailPosition(fraction) {
+    const metrics=railMetrics();
+    if(!metrics.visible)return;
+    if(metrics.mode==='turns'){
+      jumpTo(clamp(Math.round(fraction*(turns.length-1)),0,turns.length-1),true);
+      return;
+    }
+    const scroller=metrics.scroller;
+    rememberPosition(scroller);
+    const token=navigation.begin('rail');jumpSerial++;seekingIndex=-1;
+    const destination=metrics.bounds.min+clamp(fraction,0,1)*metrics.span;
+    if(navigation.write(token,scroller,destination)){
+      lastJump='正文进度条：按实际滚动位置定位';readingTouched=true;
+    }
+    navigation.finish(token);requestAnimationFrame(updateActive);
+    setTimeout(saveReadingPosition,120);
+  }
+  function railArrow(direction) {
+    const metrics=railMetrics();
+    if(!metrics.visible)return;
+    if(metrics.mode==='turns')jumpTo(clamp(activeIndex+direction,0,turns.length-1),true);
+    else jumpRailPosition(metrics.fraction+direction*metrics.scroller.clientHeight*.8/metrics.span);
   }
   function appendMarkedText(container, source, needle) {
     if (!needle) { container.textContent = source; return; }
@@ -193,26 +259,22 @@
     if(!lastSearch && !mountedOnly) scrollWithinList(list.querySelector(`.item[data-idx="${activeIndex}"]`));
   }
 
-  function indexFromPointer(event) {
-    const rect = track.getBoundingClientRect();
-    const portion = clamp((event.clientY - rect.top) / Math.max(rect.height, 1), 0, 1);
-    return clamp(Math.round(portion * (turns.length - 1)), 0, Math.max(0, turns.length - 1));
-  }
   function showPreview(event) {
-    if (!turns.length || panel.classList.contains('open')) return;
-    const index = indexFromPointer(event);
-    preview.textContent = `${index + 1}. ${turns[index].label}`;
-    preview.style.top = `${clamp(event.clientY - 20, 8, window.innerHeight - 100)}px`;
-    preview.style.display = 'block';
+    const metrics=railMetrics();
+    if(!metrics.visible||panel.classList.contains('open'))return;
+    const fraction=pointerRailFraction(event);
+    if(metrics.mode==='turns'){
+      const index=clamp(Math.round(fraction*(turns.length-1)),0,turns.length-1);
+      preview.textContent=(index+1)+'. '+turns[index].label;
+    }else preview.textContent='正文位置 '+Math.round(fraction*100)+'% · 历史未确认';
+    preview.style.top=clamp(event.clientY-20,8,window.innerHeight-100)+'px';
+    preview.style.display='block';
   }
   function setActive(index) {
     if (!turns.length) return;
     activeIndex = clamp(index, 0, turns.length - 1);
     counter.textContent = `${activeIndex+1} / ${turns.length} 轮`;
-    const frac = turns.length <= 1 ? 0 : activeIndex / (turns.length - 1);
-    marker.style.top = `${frac * 100}%`;
-    track.setAttribute('aria-valuenow', String(activeIndex + 1));
-    track.setAttribute('aria-valuetext', turns[activeIndex].label);
+    updateRailProgress();
     if (panel.classList.contains('open')) {
       list.querySelectorAll('.item.active').forEach(el => el.classList.remove('active'));
       const active = list.querySelector(`.item[data-idx="${activeIndex}"]`);
@@ -222,8 +284,8 @@
     }
   }
   function updateActive() {
-    if(!turns.length || seekingIndex>=0) return;
-    const scroller=getTimeline();if(!scroller) return;
+    if(!turns.length || seekingIndex>=0) {updateRailProgress();return;}
+    const scroller=getTimeline();if(!scroller) {updateRailProgress();return;}
     const boundary=scroller.getBoundingClientRect().top+Math.min(120,scroller.clientHeight*.25);
     let before=-1,beforeTop=-Infinity,after=-1,afterTop=Infinity;
     for(let i=0;i<turns.length;i++) {
@@ -233,6 +295,7 @@
       if(rect.top>boundary && rect.top<afterTop) {after=i;afterTop=rect.top;}
     }
     if(before>=0 || after>=0) setActive(before>=0?before:after);
+    else updateRailProgress();
     updateActiveSection();
   }
 

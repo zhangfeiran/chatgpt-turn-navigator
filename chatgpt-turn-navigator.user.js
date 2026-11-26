@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT 轮次导航 / Turn Navigator
 // @namespace    https://chatgpt.com/
-// @version      2.0.0
+// @version      2.0.1
 // @description  Modular local-first navigator: safe virtualized navigation, incremental TOCs, Markdown download/copy, cached-body search, reading resume and opt-in local Markdown sync.
 // @author       ChatGPT
 // @match        https://chatgpt.com/*
@@ -15,6 +15,7 @@
 
 (() => {
   'use strict';
+  const SCRIPT_VERSION = '2.0.1';
   if (window.__chatgptTurnNavLoaded) return;
   window.__chatgptTurnNavLoaded = true;
 
@@ -341,11 +342,12 @@
     .actions {display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;}
     .action {display:flex;align-items:center;justify-content:center;min-width:0;height:30px;
       border:1px solid var(--tn-border);border-radius:6px;background:transparent;
-      color:var(--tn-text);padding:0;font-size:16px;line-height:1;white-space:nowrap;}
+      color:var(--tn-text);padding:0;font-size:16px;line-height:1;white-space:nowrap;overflow:hidden;}
     .action:hover:not(:disabled) { background:var(--tn-hover); }
     .action:disabled {opacity:.4;cursor:not-allowed}
     .empty { color:var(--tn-muted);text-align:center;padding:24px 8px; }
-    :host([data-hidden="true"]) #rail { display:none; }
+    :host([data-hidden="true"]) #rail,
+    :host([data-hidden="true"]) #preview { display:none!important; }
     :host([data-disabled="true"]) #launcher,
     :host([data-disabled="true"]) #rail,
     :host([data-disabled="true"]) #panel,
@@ -421,6 +423,7 @@
   function initUI() {
     host = document.createElement('div');
     host.id = 'chatgpt-turn-nav-userscript';
+    host.dataset.hidden='true';
     shadow = host.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
     style.textContent = styles;
@@ -617,12 +620,14 @@
         updateLayoutPosition(); saveLayout();
       });
     }
-    track.addEventListener('click', event => jumpTo(indexFromPointer(event), true));
+    track.addEventListener('click', event => jumpRailPosition(pointerRailFraction(event)));
     track.addEventListener('keydown', event => {
       if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-        event.preventDefault(); jumpTo(clamp(activeIndex + 1, 0, turns.length - 1), true);
+        event.preventDefault(); railArrow(1);
       } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-        event.preventDefault(); jumpTo(clamp(activeIndex - 1, 0, turns.length - 1), true);
+        event.preventDefault(); railArrow(-1);
+      } else if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault(); jumpRailPosition(event.key==='Home'?0:1);
       } else if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault(); pinned = true; togglePanel(true);
       }
@@ -1327,7 +1332,12 @@
       b.setAttribute('aria-busy',String(exportBusy));
     });
     const b=shadow.getElementById('exportAll');
-    if(b) b.textContent=exportBusy?'正在准备 Markdown…':'↓ 导出整个对话';
+    if(b) {
+      // Keep the compact footer icon in both states, including route resets.
+      b.textContent='⬇';
+      b.title=exportBusy?'正在准备 Markdown…':'下载整个对话；Shift+点击则复制 Markdown，不受筛选影响';
+      b.setAttribute('aria-label',exportBusy?'正在准备整个对话 Markdown':'导出整个对话 Markdown');
+    }
   }
   const exportUnique = values => [...new Set(values.filter(Boolean))];
   function exportSafeURL(raw) {
@@ -1854,6 +1864,17 @@
     if(/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(s))s='_'+s;
     return s||'未命名';
   }
+  function archiveValidTime(value) {
+    return Number.isFinite(value)&&value>0&&Number.isFinite(new Date(value).getTime())?value:null;
+  }
+  function archiveTimestampPrefix(record,batch) {
+    const messageTime=archiveValidTime(record.messageTime);
+    const time=messageTime??archiveValidTime(batch.observedAt)??Date.now();
+    // UTC sorts chronologically even if the computer changes time zones.
+    // Mark missing source timestamps instead of fabricating a message time.
+    const stamp=new Date(time).toISOString().slice(0,19).replace('T','_').replace(/:/g,'-')+'Z';
+    return stamp+(messageTime===null?'_首次归档':'');
+  }
   function archiveHash(text) {
     return crypto.subtle.digest('SHA-256',new TextEncoder().encode(text))
       .then(bytes=>Array.from(new Uint8Array(bytes),n=>n.toString(16).padStart(2,'0')).join(''));
@@ -1927,13 +1948,14 @@
     const counts={created:0,updated:0,unchanged:0,retained:0,conflict:0,partial:0,skipped:batch.skipped||0,cancelled:0};
     if(!batch.records.length||!live())return counts;
     const dir=await archiveConversationDir(root,batch,live);if(!dir)return counts;
-    const files=new Map();let serial=0;
+    const files=new Map();
     for await(const [name,handle] of dir.entries()) {
       if(handle.kind!=='file')continue;
-      const match=name.match(/^(\d{4,}) - .+ -- ([0-9a-f-]{36})\.md$/i);
+      // Existing numbered archives, timestamp archives and renamed files
+      // with the same UUID suffix all retain their original file identity.
+      const match=name.match(/ -- ([0-9a-f-]{36})\.md$/i);
       if(!match)continue;
-      serial=Math.max(serial,Number(match[1])||0);
-      const id=archiveStableId(match[2]);if(!id)continue;
+      const id=archiveStableId(match[1]);if(!id)continue;
       if(!files.has(id))files.set(id,[]);
       files.get(id).push(name);
     }
@@ -1943,7 +1965,7 @@
       if(record.quality==='partial')counts.partial++;
       const prior=files.get(record.anchorId)||[];
       if(prior.length>1){counts.conflict++;continue;}
-      const name=prior[0]||String(++serial).padStart(4,'0')+' - '+archiveSafeName(record.label)+' -- '+record.anchorId+'.md';
+      const name=prior[0]||archiveTimestampPrefix(record,batch)+' - '+archiveSafeName(record.label)+' -- '+record.anchorId+'.md';
       const result=await archiveWriteManaged(dir,name,record,live,digest);
       counts[result]++;
       if(result==='cancelled')break;
@@ -1957,7 +1979,7 @@
     const others=[...files.values()].flat().filter(n=>!included.has(n)).sort();
     const links=names=>names.map(n=>'- ['+archiveSafeMarkdownLabel(n.replace(/ -- [0-9a-f-]{36}\.md$/i,''))+']('+encodeURIComponent(n)+')').join('\n');
     const body='# '+archiveSafeMarkdownLabel(batch.title)+'\n\n> 原对话：'+batch.url+
-      '\n> 当前可取得的轮次，非完整历史证明。文件名前缀是首次归档顺序；此索引按本次已知对话顺序排列。\n\n## 本次已知轮次\n\n'+
+      '\n> 当前可取得的轮次，非完整历史证明。新文件名前缀优先使用消息时间（UTC），缺失时标记首次归档时间；旧编号文件保留原名。此索引按本次已知对话顺序排列。\n\n## 本次已知轮次\n\n'+
       (links(ordered)||'（无）')+'\n\n## 其他已归档文件（含历史或分支）\n\n'+(links(others)||'（无）')+'\n';
     const index=await archiveWriteManaged(dir,'_index.md',{key:'index:'+batch.id,body,quality:'complete',answerIds:[],observedAt:batch.observedAt},live,digest);
     if(index==='conflict')counts.conflict++;
@@ -2109,13 +2131,16 @@
     for(const turn of turns) {
       const snapshot=exportFindSnapshot(turn),ids=turnIds(turn);
       const outlines=turn.answers||[];
-      const answers=[],answerIds=[],notes=[];let partial=false,anchorId=null;
+      const answers=[],answerIds=[],notes=[];let partial=false,anchorId=null,anchorTime=null;
       for(const outline of outlines) {
         const oids=exportUnique([outline.key,...(outline.ids||[])]);
         const stable=oids.map(archiveStableId).filter(Boolean);
         const answerId=stable[0];
         if(!answerId){partial=true;continue;}
-        if(!anchorId)anchorId=answerId;
+        if(!anchorId){
+          anchorId=answerId;
+          anchorTime=oids.map(x=>exportAPI.get(x)).find(a=>a?.role==='assistant'&&archiveValidTime(a.time)!==null)?.time??null;
+        }
         if(answerIds.includes(answerId))continue;
         const dom=snapshot?.answers?.find(a=>a.ids?.some(x=>oids.includes(x))||oids.includes(a.id));
         const api=oids.map(x=>exportAPI.get(x)).find(a=>a?.role==='assistant'&&a.markdown?.trim()&&!a.unfinished);
@@ -2143,13 +2168,18 @@
       if(notes.some(n=>/未取得|未完整|缺失|无法还原|未导出|不包含|仅保留|重建/.test(n)))partial=true;
       const label=turn.label||'问答';
       const body=['# '+archiveSafeMarkdownLabel(label),'> 原对话：'+scope];
-      if(Number.isFinite(turn.time))body.push('> 消息时间：'+new Date(turn.time).toISOString());
+      const questionTime=archiveValidTime(userRecord?.time);
+      const turnTime=archiveValidTime(turn.time);
+      const answerTime=archiveValidTime(anchorTime);
+      const messageTime=questionTime??turnTime??answerTime;
+      if(messageTime!==null)body.push('> '+(questionTime!==null?'提问时间':turnTime!==null?'消息时间':'回答时间')+'：'+new Date(messageTime).toISOString());
+      else body.push('> 原始消息时间未取得；新建文件名使用首次归档时间。');
       if(partial)body.push('> 归档说明：本轮已取得部分内容；不能保证源码、附件或回答完整。');
       if(notes.length)body.push('> '+exportUnique(notes).join('\n> '));
       if(question)body.push('**提问**',question.markdown);
       for(const [i,a] of answers.entries())body.push('**回答'+(answers.length>1?' '+(i+1):'')+'**',exportRebaseAnswerHeadings(a.markdown));
       records.push({key:id+':'+(userId||'assistant')+':'+anchorId,anchorId,answerIds,
-        label,quality:partial?'partial':'complete',body:body.join('\n\n')+'\n',
+        label,messageTime,quality:partial?'partial':'complete',body:body.join('\n\n')+'\n',
         observedAt:Math.max(0,...[question,...answers].filter(Boolean).map(a=>Number(a.observedAt)||0))||observedAt});
     }
     return {id,url:scope,title,records,skipped,observedAt};
@@ -2247,7 +2277,7 @@
   function diagnose() {
     const root = document, mains = [...document.querySelectorAll('main')];
     return {
-      script: '1.9.0', routeIsChat: isChatPage(),
+      script: SCRIPT_VERSION, routeIsChat: isChatPage(),
       mainCount: mains.length, firstMainChildren: mains[0]?.children.length ?? 0,
       documentTurnShells: root.querySelectorAll(SHELL_SELECTOR).length,
       mainTurnShells: mains[0]?.querySelectorAll(SHELL_SELECTOR).length ?? 0,
@@ -2275,7 +2305,8 @@
       outline: {answers:turns.reduce((n,t)=>n+(t.answers||[]).length,0),headings:turns.reduce((n,t)=>n+(t.answers||[]).reduce((a,b)=>a+b.headings.length,0),0),expanded:expandedAnswers.size},
       ux: {mountedOnly,returnHistoryCount:returnPositions.length,filterMatchCount:filteredIndices.length},
       scrollMetrics: (() => { const s=getTimeline(); return s ? {direction:getComputedStyle(s).flexDirection,scrollTop:s.scrollTop,scrollHeight:s.scrollHeight,clientHeight:s.clientHeight,range:scrollBounds(s)} : null; })(),
-      markdownExport:{apiBodies:exportAPI.size,domSnapshots:exportDOM.size,busy:exportBusy},
+      rail:(()=>{const m=railMetrics();return {mode:m.mode,visible:m.visible,scrollPercent:Math.round(m.fraction*10000)/100,span:m.span};})(),
+      markdownExport:{apiBodies:exportAPI.size,domSnapshots:exportDOM.size,busy:exportBusy,allButtonIconOnly:shadow?.getElementById('exportAll')?.textContent==='⬇'},
       lastJump,
       incremental:{...contentTracker.metrics,...runtimeMetrics},
       navigation:navigation.summary(),
@@ -2655,17 +2686,16 @@
     indexCatalog=turns.map(metadataSnapshot);
     // Retain outlines, not detached DOM trees. The live turns array owns live nodes.
     for(const t of indexCatalog) if(t.answers.length) answerCache.set(t.key,t.answers);
-    host.dataset.hidden = turns.length < 2 ? 'true' : 'false';
     counter.textContent = `${turns.length ? Math.min(activeIndex+1,turns.length) + ' / ' : ''}${turns.length} 轮`;
     const unmounted=turns.filter(t=>!t.node).length, mounted=turns.length-unmounted;
     syncFilterButton();
     // Routine indexing details are available in #coverage and diagnostics, not the footer.
     const fingerprint = (bodySearch&&lastSearch?String(exportContentRevision):'')+turns.map(t => `${t.key}:${t.label}:${t.role}:${!!t.node}:`+(t.answers||[]).map(a=>`${a.key}:${a.source}:`+a.headings.map(h=>`${h.level}:${h.text}:${!!h.node?.isConnected}`).join('|')).join('~')).join('\u0001');
     if (force || fingerprint !== lastFingerprint) {
-      lastFingerprint = fingerprint; renderTicks();
+      lastFingerprint = fingerprint;
       if (panel.classList.contains('open')) renderList();
     }
-    updateActive();updateCoverage();syncReadingButton();
+    renderTicks();updateActive();updateCoverage();syncReadingButton();
     archiveObserve();
     if (chatId() && !apiPending && apiKey !== `${location.origin}:${chatId()}`) {
       // Read once per conversation, not on every DOM mutation.
@@ -2680,20 +2710,86 @@
 
 
   // ===== src/ui/outline-list.js =====
+  // The compact rail cannot assume that a virtualized DOM represents every
+  // turn. Use physical scroll progress until history is confirmed.
+  let railTickFingerprint='';
+  function railMetrics(scroller=getTimeline()) {
+    const bounds=scroller?scrollBounds(scroller):{min:0,max:0,reversed:false};
+    const span=Math.max(0,bounds.max-bounds.min);
+    const mode=apiComplete&&turns.length>=2?'turns':'scroll';
+    const fraction=span>1?clamp((scroller.scrollTop-bounds.min)/span,0,1):0;
+    return {scroller,bounds,span,mode,fraction,visible:!!scroller&&span>1};
+  }
+  function updateRailProgress(metrics=railMetrics()) {
+    if(!host||!track||!marker)return;
+    const {mode,fraction,visible}=metrics;
+    host.dataset.hidden=visible?'false':'true';
+    rail.dataset.mode=mode;
+    if(!visible){preview.style.display='none';marker.style.top='0%';}
+    const complete=mode==='turns';
+    const value=complete?clamp(activeIndex+1,1,turns.length):Math.round(fraction*100);
+    const display=complete?(turns.length<2?0:(value-1)/(turns.length-1)):fraction;
+    marker.style.top=(visible?display*100:0)+'%';
+    track.setAttribute('aria-valuemin',complete?'1':'0');
+    track.setAttribute('aria-valuemax',complete?String(turns.length):'100');
+    track.setAttribute('aria-valuenow',String(value));
+    track.setAttribute('aria-label',complete?'按轮次跳转对话':'正文滚动进度（历史未确认时按实际位置导航）');
+    track.setAttribute('aria-valuetext',complete?(turns[value-1]?.label||'第 '+value+' 轮'):'正文 '+value+'%（不代表完整轮次）');
+    track.title=complete?'已确认历史：按轮次定位':'按实际滚动位置定位；历史轮次可能尚未加载';
+  }
   function renderTicks() {
-    track.querySelectorAll('.tick').forEach(el => el.remove());
-    const count = turns.length;
-    if (!count) return;
-    const amount = Math.min(CONFIG.maxTicks, count);
-    const fragment = document.createDocumentFragment();
-    for (let i = 0; i < amount; i++) {
-      const tick = document.createElement('div');
-      tick.className = 'tick';
-      tick.style.top = `${amount === 1 ? 0 : i / (amount - 1) * 100}%`;
-      fragment.appendChild(tick);
+    const metrics=railMetrics(),count=turns.length;
+    let positions=[];
+    if(metrics.visible && metrics.mode==='turns'){
+      const amount=Math.min(CONFIG.maxTicks,count);
+      positions=Array.from({length:amount},(_,i)=>amount===1?0:i/(amount-1));
+    } else if(metrics.visible) {
+      // Only show physically measured, current-layout turn anchors; never
+      // distribute a partial index evenly across the entire document.
+      const inset=timelineJumpInset(metrics.scroller);
+      const points=turns.map(t=>geometry.get(t,turnIds)).filter(p=>p&&Number.isFinite(p.top));
+      positions=[...new Set(points.map(p=>Math.round(clamp((p.top-inset-metrics.bounds.min)/metrics.span,0,1)*10000)/10000))].sort((a,b)=>a-b);
+      if(positions.length>CONFIG.maxTicks)positions=Array.from({length:CONFIG.maxTicks},(_,i)=>positions[Math.round(i*(positions.length-1)/(CONFIG.maxTicks-1))]);
     }
-    track.insertBefore(fragment, marker);
-    track.setAttribute('aria-valuemax', String(count));
+    const key=metrics.mode+'|'+metrics.visible+'|'+positions.join(',');
+    if(key!==railTickFingerprint){
+      railTickFingerprint=key;
+      track.querySelectorAll('.tick').forEach(el=>el.remove());
+      const fragment=document.createDocumentFragment();
+      for(const position of positions){
+        const tick=document.createElement('div');tick.className='tick';
+        tick.style.top=(position*100)+'%';fragment.appendChild(tick);
+      }
+      track.insertBefore(fragment,marker);
+    }
+    updateRailProgress(metrics);
+  }
+  function pointerRailFraction(event) {
+    const rect=track.getBoundingClientRect();
+    return clamp((event.clientY-rect.top)/Math.max(rect.height,1),0,1);
+  }
+  function jumpRailPosition(fraction) {
+    const metrics=railMetrics();
+    if(!metrics.visible)return;
+    if(metrics.mode==='turns'){
+      jumpTo(clamp(Math.round(fraction*(turns.length-1)),0,turns.length-1),true);
+      return;
+    }
+    const scroller=metrics.scroller;
+    rememberPosition(scroller);
+    const token=navigation.begin('rail');jumpSerial++;seekingIndex=-1;
+    const destination=metrics.bounds.min+clamp(fraction,0,1)*metrics.span;
+    if(navigation.write(token,scroller,destination)){
+      lastJump='正文进度条：按实际滚动位置定位';readingTouched=true;
+    }
+    navigation.finish(token);requestAnimationFrame(updateActive);
+    setTimeout(saveReadingPosition,120);
+  }
+  function railArrow(direction) {
+    const metrics=railMetrics();
+    if(!metrics.visible)return;
+    if(metrics.mode==='turns')jumpTo(clamp(activeIndex+direction,0,turns.length-1),true);
+    else jumpRailPosition(metrics.fraction+direction*metrics.scroller.clientHeight*.8/metrics.span);
   }
   function appendMarkedText(container, source, needle) {
     if (!needle) { container.textContent = source; return; }
@@ -2875,26 +2971,22 @@
     if(!lastSearch && !mountedOnly) scrollWithinList(list.querySelector(`.item[data-idx="${activeIndex}"]`));
   }
 
-  function indexFromPointer(event) {
-    const rect = track.getBoundingClientRect();
-    const portion = clamp((event.clientY - rect.top) / Math.max(rect.height, 1), 0, 1);
-    return clamp(Math.round(portion * (turns.length - 1)), 0, Math.max(0, turns.length - 1));
-  }
   function showPreview(event) {
-    if (!turns.length || panel.classList.contains('open')) return;
-    const index = indexFromPointer(event);
-    preview.textContent = `${index + 1}. ${turns[index].label}`;
-    preview.style.top = `${clamp(event.clientY - 20, 8, window.innerHeight - 100)}px`;
-    preview.style.display = 'block';
+    const metrics=railMetrics();
+    if(!metrics.visible||panel.classList.contains('open'))return;
+    const fraction=pointerRailFraction(event);
+    if(metrics.mode==='turns'){
+      const index=clamp(Math.round(fraction*(turns.length-1)),0,turns.length-1);
+      preview.textContent=(index+1)+'. '+turns[index].label;
+    }else preview.textContent='正文位置 '+Math.round(fraction*100)+'% · 历史未确认';
+    preview.style.top=clamp(event.clientY-20,8,window.innerHeight-100)+'px';
+    preview.style.display='block';
   }
   function setActive(index) {
     if (!turns.length) return;
     activeIndex = clamp(index, 0, turns.length - 1);
     counter.textContent = `${activeIndex+1} / ${turns.length} 轮`;
-    const frac = turns.length <= 1 ? 0 : activeIndex / (turns.length - 1);
-    marker.style.top = `${frac * 100}%`;
-    track.setAttribute('aria-valuenow', String(activeIndex + 1));
-    track.setAttribute('aria-valuetext', turns[activeIndex].label);
+    updateRailProgress();
     if (panel.classList.contains('open')) {
       list.querySelectorAll('.item.active').forEach(el => el.classList.remove('active'));
       const active = list.querySelector(`.item[data-idx="${activeIndex}"]`);
@@ -2904,8 +2996,8 @@
     }
   }
   function updateActive() {
-    if(!turns.length || seekingIndex>=0) return;
-    const scroller=getTimeline();if(!scroller) return;
+    if(!turns.length || seekingIndex>=0) {updateRailProgress();return;}
+    const scroller=getTimeline();if(!scroller) {updateRailProgress();return;}
     const boundary=scroller.getBoundingClientRect().top+Math.min(120,scroller.clientHeight*.25);
     let before=-1,beforeTop=-Infinity,after=-1,afterTop=Infinity;
     for(let i=0;i<turns.length;i++) {
@@ -2915,6 +3007,7 @@
       if(rect.top>boundary && rect.top<afterTop) {after=i;afterTop=rect.top;}
     }
     if(before>=0 || after>=0) setActive(before>=0?before:after);
+    else updateRailProgress();
     updateActiveSection();
   }
 

@@ -29,3 +29,7 @@ python tests/test_jump_clearance.py
 ## Local archive tests
 
 Run `node tests/test_local_archive.mjs` (Node.js 20+; no dependencies). Uses simulated directory handles and injected hash function to check file isolation, incremental writes, conflicts, pause, partial-content protection and batch selection. This does not replace real browser directory-authorization testing.
+
+## Timestamp naming and compact rail regressions
+
+Run `node tests/test_local_archive.mjs` and `node tests/test_rail_footer.mjs`. The former also checks real versus first-archive timestamps, late history and compatibility with existing numbered files; the latter exercises incomplete/confirmed histories, physical scroll bounds, reverse scrolling and busy/idle export icon state. These are simulated logic tests, not a live ChatGPT browser test.

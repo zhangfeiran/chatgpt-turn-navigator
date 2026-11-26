@@ -24,6 +24,9 @@ def main() -> None:
     version = manifest["version"]
     if "@version      " + version not in text:
         raise ValueError("Manifest and userscript version differ")
+    if text.count("__CTN_BUILD_VERSION__") != 1:
+        raise ValueError("Expected exactly one runtime version placeholder")
+    text = text.replace("__CTN_BUILD_VERSION__", version)
     path = root / "chatgpt-turn-navigator.user.js"
     path.write_text(text, encoding="utf-8")
     print(path.name + " (" + str(path.stat().st_size) + " bytes)")

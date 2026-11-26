@@ -1,7 +1,7 @@
   function diagnose() {
     const root = document, mains = [...document.querySelectorAll('main')];
     return {
-      script: '1.9.0', routeIsChat: isChatPage(),
+      script: SCRIPT_VERSION, routeIsChat: isChatPage(),
       mainCount: mains.length, firstMainChildren: mains[0]?.children.length ?? 0,
       documentTurnShells: root.querySelectorAll(SHELL_SELECTOR).length,
       mainTurnShells: mains[0]?.querySelectorAll(SHELL_SELECTOR).length ?? 0,
@@ -29,7 +29,8 @@
       outline: {answers:turns.reduce((n,t)=>n+(t.answers||[]).length,0),headings:turns.reduce((n,t)=>n+(t.answers||[]).reduce((a,b)=>a+b.headings.length,0),0),expanded:expandedAnswers.size},
       ux: {mountedOnly,returnHistoryCount:returnPositions.length,filterMatchCount:filteredIndices.length},
       scrollMetrics: (() => { const s=getTimeline(); return s ? {direction:getComputedStyle(s).flexDirection,scrollTop:s.scrollTop,scrollHeight:s.scrollHeight,clientHeight:s.clientHeight,range:scrollBounds(s)} : null; })(),
-      markdownExport:{apiBodies:exportAPI.size,domSnapshots:exportDOM.size,busy:exportBusy},
+      rail:(()=>{const m=railMetrics();return {mode:m.mode,visible:m.visible,scrollPercent:Math.round(m.fraction*10000)/100,span:m.span};})(),
+      markdownExport:{apiBodies:exportAPI.size,domSnapshots:exportDOM.size,busy:exportBusy,allButtonIconOnly:shadow?.getElementById('exportAll')?.textContent==='⬇'},
       lastJump,
       incremental:{...contentTracker.metrics,...runtimeMetrics},
       navigation:navigation.summary(),

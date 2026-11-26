@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT 轮次导航 / Turn Navigator
 // @namespace    https://chatgpt.com/
-// @version      2.0.0
+// @version      2.0.1
 // @description  Modular local-first navigator: safe virtualized navigation, incremental TOCs, Markdown download/copy, cached-body search, reading resume and opt-in local Markdown sync.
 // @author       ChatGPT
 // @match        https://chatgpt.com/*
@@ -15,6 +15,7 @@
 
 (() => {
   'use strict';
+  const SCRIPT_VERSION = '__CTN_BUILD_VERSION__';
   if (window.__chatgptTurnNavLoaded) return;
   window.__chatgptTurnNavLoaded = true;
 

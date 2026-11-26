@@ -142,13 +142,16 @@
     for(const turn of turns) {
       const snapshot=exportFindSnapshot(turn),ids=turnIds(turn);
       const outlines=turn.answers||[];
-      const answers=[],answerIds=[],notes=[];let partial=false,anchorId=null;
+      const answers=[],answerIds=[],notes=[];let partial=false,anchorId=null,anchorTime=null;
       for(const outline of outlines) {
         const oids=exportUnique([outline.key,...(outline.ids||[])]);
         const stable=oids.map(archiveStableId).filter(Boolean);
         const answerId=stable[0];
         if(!answerId){partial=true;continue;}
-        if(!anchorId)anchorId=answerId;
+        if(!anchorId){
+          anchorId=answerId;
+          anchorTime=oids.map(x=>exportAPI.get(x)).find(a=>a?.role==='assistant'&&archiveValidTime(a.time)!==null)?.time??null;
+        }
         if(answerIds.includes(answerId))continue;
         const dom=snapshot?.answers?.find(a=>a.ids?.some(x=>oids.includes(x))||oids.includes(a.id));
         const api=oids.map(x=>exportAPI.get(x)).find(a=>a?.role==='assistant'&&a.markdown?.trim()&&!a.unfinished);
@@ -176,13 +179,18 @@
       if(notes.some(n=>/未取得|未完整|缺失|无法还原|未导出|不包含|仅保留|重建/.test(n)))partial=true;
       const label=turn.label||'问答';
       const body=['# '+archiveSafeMarkdownLabel(label),'> 原对话：'+scope];
-      if(Number.isFinite(turn.time))body.push('> 消息时间：'+new Date(turn.time).toISOString());
+      const questionTime=archiveValidTime(userRecord?.time);
+      const turnTime=archiveValidTime(turn.time);
+      const answerTime=archiveValidTime(anchorTime);
+      const messageTime=questionTime??turnTime??answerTime;
+      if(messageTime!==null)body.push('> '+(questionTime!==null?'提问时间':turnTime!==null?'消息时间':'回答时间')+'：'+new Date(messageTime).toISOString());
+      else body.push('> 原始消息时间未取得；新建文件名使用首次归档时间。');
       if(partial)body.push('> 归档说明：本轮已取得部分内容；不能保证源码、附件或回答完整。');
       if(notes.length)body.push('> '+exportUnique(notes).join('\n> '));
       if(question)body.push('**提问**',question.markdown);
       for(const [i,a] of answers.entries())body.push('**回答'+(answers.length>1?' '+(i+1):'')+'**',exportRebaseAnswerHeadings(a.markdown));
       records.push({key:id+':'+(userId||'assistant')+':'+anchorId,anchorId,answerIds,
-        label,quality:partial?'partial':'complete',body:body.join('\n\n')+'\n',
+        label,messageTime,quality:partial?'partial':'complete',body:body.join('\n\n')+'\n',
         observedAt:Math.max(0,...[question,...answers].filter(Boolean).map(a=>Number(a.observedAt)||0))||observedAt});
     }
     return {id,url:scope,title,records,skipped,observedAt};

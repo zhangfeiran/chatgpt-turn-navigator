@@ -13,7 +13,12 @@
       b.setAttribute('aria-busy',String(exportBusy));
     });
     const b=shadow.getElementById('exportAll');
-    if(b) b.textContent=exportBusy?'正在准备 Markdown…':'↓ 导出整个对话';
+    if(b) {
+      // Keep the compact footer icon in both states, including route resets.
+      b.textContent='⬇';
+      b.title=exportBusy?'正在准备 Markdown…':'下载整个对话；Shift+点击则复制 Markdown，不受筛选影响';
+      b.setAttribute('aria-label',exportBusy?'正在准备整个对话 Markdown':'导出整个对话 Markdown');
+    }
   }
   const exportUnique = values => [...new Set(values.filter(Boolean))];
   function exportSafeURL(raw) {
